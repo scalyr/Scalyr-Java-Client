@@ -17,12 +17,11 @@
 
 package com.scalyr.api.json;
 
+import com.scalyr.api.internal.ScalyrUtil;
+
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-
-import com.scalyr.api.internal.FlushlessOutputStream;
 
 /**
  * A JSON array. JSONObject supports java.util.List interface.
@@ -37,20 +36,18 @@ public class JSONArray extends ArrayList<Object> implements JSONStreamAware {
     out.write('[');
     
     boolean first = true;
-    OutputStreamWriter writer = new OutputStreamWriter(new FlushlessOutputStream(out));
-    
+
     for (Object value : this) {
       if (first)
         first = false;
       else
-        writer.write(',');
+        out.write(',');
 
       if (value == null) {
-        writer.write("null");
+        out.write("null".getBytes(ScalyrUtil.utf8));
         continue;
       }
 
-      writer.flush();
       if (value instanceof JSONStreamAware) {
         ((JSONStreamAware)value).writeJSONBytes(out);
       } else {
@@ -59,7 +56,6 @@ public class JSONArray extends ArrayList<Object> implements JSONStreamAware {
     }
     
     out.write(']');
-    writer.close();
   }
   
   @Override public String toString() {

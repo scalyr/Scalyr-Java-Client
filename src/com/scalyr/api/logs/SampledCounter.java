@@ -29,7 +29,10 @@ import java.util.concurrent.atomic.AtomicLong;
  *   
  *   counter.increment();
  * </pre>
+ * 
+ * @deprecated all of the functionality of this class is available in CounterGauge.
  */
+@Deprecated
 public class SampledCounter extends Gauge {
   /**
    * Holds the current counter value. The value is actually a double; it is stored here in

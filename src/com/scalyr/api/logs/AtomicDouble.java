@@ -45,13 +45,13 @@ public class AtomicDouble {
     bits = Double.doubleToRawLongBits(newValue);
   }
   
-  public void add(double delta) {
+  public double add(double delta) {
     while (true) {
       long currentBits = bits;
       double currentValue = Double.longBitsToDouble(currentBits);
-      long nextBits = Double.doubleToRawLongBits(currentValue + delta);
-      if (updater.compareAndSet(this, currentBits, nextBits)) {
-        break;
+      double newValue = currentValue + delta;
+      if (updater.compareAndSet(this, currentBits, Double.doubleToRawLongBits(newValue))) {
+        return newValue;
       }
     }
   }

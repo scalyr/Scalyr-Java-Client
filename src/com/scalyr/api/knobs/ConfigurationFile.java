@@ -17,14 +17,6 @@
 
 package com.scalyr.api.knobs;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.scalyr.api.Callback;
 import com.scalyr.api.ScalyrDeadlineException;
 import com.scalyr.api.ScalyrException;
@@ -34,6 +26,10 @@ import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.json.JSONParser;
 import com.scalyr.api.json.JSONParser.JsonParseException;
 import com.scalyr.api.logs.Severity;
+
+import java.io.File;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Abstract interface for a configuration file.
@@ -91,6 +87,13 @@ public abstract class ConfigurationFile {
    * True if close() has been called on this file.
    */
   private boolean closed;
+
+  /**
+   * Normally false. LocalConfigurationFile has logic so that if a file contains valid JSON and is then changed to invalid
+   * JSON, we will ignore the update and continue using the last valid JSON version of the file. When the file is in that
+   * state, this field will be true. If the file is updated to contain valid JSON again, this field is cleared.
+   */
+  public volatile boolean maskingInvalidJson;
 
   /**
    * Return a ConfigurationFileFactory that retrieves files from the local filesystem.

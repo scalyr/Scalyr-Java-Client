@@ -17,6 +17,13 @@
 
 package com.scalyr.api.knobs;
 
+import com.scalyr.api.internal.Logging;
+import com.scalyr.api.internal.ScalyrUtil;
+import com.scalyr.api.json.JSONObject;
+import com.scalyr.api.json.JSONParser;
+import com.scalyr.api.json.JSONParser.JsonParseException;
+import com.scalyr.api.logs.Severity;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -24,14 +31,16 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import com.scalyr.api.internal.Logging;
-import com.scalyr.api.internal.ScalyrUtil;
-import com.scalyr.api.logs.Severity;
-
 /**
  * ConfigurationFile implementation that reads from a file in the local filesystem.
  */
 public class LocalConfigurationFile extends ConfigurationFile {
+  /**
+   * If true, when a configuration file transitions from valid JSON to invalid JSON (or missing file), we retain the last good
+   * JSON. Currently always true except in tests.
+   */
+  public static volatile boolean useLastKnownGoodJson = true;
+
   private final File rootDir;
   
   /**
@@ -166,6 +175,7 @@ public class LocalConfigurationFile extends ConfigurationFile {
     if (fileLen >= 0) {
       try {
         newFileContent = ScalyrUtil.readFileContent(file);
+
       } catch (UnsupportedEncodingException ex) {
         Logging.log(Severity.warning, Logging.tagLocalConfigFileError,
             "Error reading file [" + file.getAbsolutePath() + "]", ex);
@@ -187,19 +197,45 @@ public class LocalConfigurationFile extends ConfigurationFile {
       unchangedInARow++;
       return;
     }
-      
+
+    boolean oldContentWasValidJsonObject = isValidJsonObject(fileContent);
+
     unchangedInARow = 0;
     fileContent = newFileContent;
-    
-    if (fileLen >= 0) {
+
+    if (useLastKnownGoodJson && oldContentWasValidJsonObject && !isValidJsonObject(fileContent)) {
+      // If this file used to contain valid JSON, but no longer does, then ignore the new content and log a warning.
+      String message = "File [" + file.getAbsolutePath() + "] (length " + (fileContent != null ? fileContent.length() : 0) + ") is not valid JSON; using last-known-good state";
+      Logging.log(Severity.warning, Logging.tagLocalConfigFileError, message, new RuntimeException(message));
+
+      maskingInvalidJson = true;
+    } else if (fileLen >= 0) {
       // Note that Java doesn't provide a way to access the file's creation date, so we report it as being
       // equal to the last modification date.
       versionCounter++;
       setFileState(new FileState(versionCounter, newFileContent, new Date(newLastModified), new Date(newLastModified)));
+
+      maskingInvalidJson = false;
     } else {
       versionCounter = 0;
       
       setFileState(new FileState(0, null, null, null));
+
+      maskingInvalidJson = false;
+    }
+  }
+
+  /**
+   * Return true if the input is a valid JSON object.
+   */
+  private static boolean isValidJsonObject(String s) {
+    if (s == null || s.length() == 0)
+      return false;
+
+    try {
+      return JSONParser.parse(s) instanceof JSONObject;
+    } catch (JsonParseException ex) {
+      return false;
     }
   }
 }

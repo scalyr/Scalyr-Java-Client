@@ -17,11 +17,6 @@
 
 package com.scalyr.api.query;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.scalyr.api.ScalyrException;
 import com.scalyr.api.ScalyrNetworkException;
 import com.scalyr.api.ScalyrServerException;
@@ -30,6 +25,11 @@ import com.scalyr.api.json.JSONArray;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.logs.EventAttributes;
 import com.scalyr.api.logs.Severity;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Encapsulates the raw HTTP-level API to the log query service.
@@ -68,15 +68,18 @@ public class QueryService extends ScalyrService {
    *     head to get the oldest matches in the specified time range, or tail to get the newest.
    * @param columns A comma-delimited list of fields to return for each log message. To retrieve all fields,
    *     pass null (or the empty string).
-   * @param continuationToken Used to page through result sets larger than maxCount. Omit this parameter for
-   *     your first query. You may then repeat the query with the same filter, startTime, endTime, and pageMode
-   *     to retrieve further matches. Each time, set continuationToken to the value returned by the previous query.
-   * 
+   * @param continuationToken Used to page through result sets larger than maxCount. Pass null for your
+   *     first query. You may then repeat the query with the same filter, startTime, endTime, and pageMode to
+   *     retrieve further matches. Each time, set continuationToken to the value returned by the previous query.
+   *     When using continuationToken, you should set startTime and endTime to absolute values, not relative values
+   *     such as ``4h``. If you use relative time values, and the time range drifts so that the continuation token
+   *     refers to an event that falls outside the new time range, the query will fail.
+   *
    * @throws ScalyrException if a low-level error occurs (e.g. network failure)
    * @throws ScalyrServerException if the Scalyr service returns an error
    */
   public LogQueryResult logQuery(String filter, String startTime, String endTime, Integer maxCount,
-      PageMode pageMode, String columns, String continuationToken )
+      PageMode pageMode, String columns, String continuationToken)
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
@@ -235,6 +238,75 @@ public class QueryService extends ScalyrService {
     return result;
   }
 
+  /**
+   * Retrieve the most common values of a field. For instance, you can find the most common URLs accessed on your
+   * site, the most common user-agent strings, or the most common response codes returned. (If a very large number
+   * of events match your search criteria, the results will be based on a random subsample of at least 500,000
+   * matching events.)
+   * 
+   * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
+   *     query UI. To match all log records, pass null or an empty string.
+   * @param field Specifies which event field to retrieve.
+   * @param maxCount The number of unique values to return. The most common values are returned, up to this limit.
+   *   You may specify a value from 1 to 1000. If you pass null, the default (currently 100) is used.
+   * @param startTime The beginning of the time range to query, using the same syntax as the query UI. You can
+   *     also supply a simple timestamp, measured in seconds, milliseconds, or nanoseconds since 1/1/1970.
+   * @param endTime The end of the time range to query, using the same syntax as the query UI. You can also
+   *     supply a simple timestamp, measured in seconds, milliseconds, or nanoseconds since 1/1/1970.
+   * 
+   * @throws ScalyrException if a low-level error occurs (e.g. network failure)
+   * @throws ScalyrServerException if the Scalyr service returns an error
+   */
+  public FacetQueryResult facetQuery(String filter, String field, Integer maxCount, String startTime, String endTime)
+      throws ScalyrException, ScalyrNetworkException {
+    JSONObject parameters = new JSONObject();
+    parameters.put("token", apiToken);
+    parameters.put("queryType", "facet");
+    
+    if (filter != null)
+      parameters.put("filter", filter);
+    
+    parameters.put("field", field);
+    
+    if (maxCount != null)
+      parameters.put("maxCount", maxCount);
+    
+    if (startTime != null)
+      parameters.put("startTime", startTime);
+    
+    if (endTime != null)
+      parameters.put("endTime", endTime);
+    
+    JSONObject rawApiResponse = invokeApi("api/facetQuery", parameters);
+    checkResponseStatus(rawApiResponse);
+    return unpackFacetQueryResult(rawApiResponse);
+  }
+  
+  /**
+   * Given the raw server response to a facet query, encapsulate the query result in a FacetQueryResult.
+   * The caller should verify that the query was successful (returned status "success").
+   */
+  private FacetQueryResult unpackFacetQueryResult(JSONObject rawApiResponse) {
+    // Unpack singleton fields of the response.
+    Double executionTime = convertToDouble(rawApiResponse.get("executionTime"));
+    if (executionTime == null)
+      executionTime = 0.0;
+    
+    Long matchCount = convertToLong(rawApiResponse.get("matchCount"));
+    if (matchCount == null)
+      matchCount = 0L;
+    
+    // Create a FacetQueryResult object.
+    FacetQueryResult result = new FacetQueryResult(matchCount, executionTime);
+    
+    // Populate the values array.
+    for (Object value : (JSONArray) rawApiResponse.get("values")) {
+      result.values.add(new ValueAndCount((JSONObject) value));
+    }
+    
+    return result;
+  }
+  
   /**
    * Retrieve numeric data from a previously defined timeseries. This method is similar to numericQuery(), but relies on
    * parameters defined by a previous call to createTimeseries, and usually executes in a few milliseconds (plus network
@@ -519,7 +591,10 @@ public class QueryService extends ScalyrService {
    */
   public static class NumericQueryResult {
     /**
-     * The requested numeric values, one for each bucket specified in the query.
+     * The requested numeric values, one for each bucket specified in the query. If a time bucket has
+     * no events matching the query, the corresponding value will be null. (Some query functions, such as
+     * sumPerSecond, return 0 instead of null when there are no events matching per query. Null is used
+     * when the logical value of the query function is undefined.)
      */
     public final List<Double> values = new ArrayList<Double>();
     
@@ -553,6 +628,75 @@ public class QueryService extends ScalyrService {
   }
   
   /**
+   * Encapsulates the result of executing a facet query.
+   */
+  public static class FacetQueryResult {
+    /**
+     * Contains an entry for each unique value in the requested field, up to a maximum determined by
+     * the maxCount parameter of the query. Values are sorted in order of decreasing count.
+     */
+    public final List<ValueAndCount> values = new ArrayList<ValueAndCount>();
+    
+    /**
+     * The total number of events matching the query.
+     */
+    public final long matchCount;
+    
+    /**
+     * How much time the server spent processing this query, in milliseconds.
+     */
+    public final double executionTime;
+    
+    FacetQueryResult(long matchCount, double executionTime) {
+      this.matchCount = matchCount;
+      this.executionTime = executionTime;
+    }
+    
+    @Override public String toString() {
+      int valueCount = values.size();
+      
+      StringBuilder sb = new StringBuilder();
+      sb.append("{FacetQueryResult: ");
+      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "") 
+          + ", " + matchCount + " matching event" + (matchCount != 1 ? "s" : "")
+          + ", execution time " + executionTime + " ms, values [");
+      
+      for (int i = 0; i < values.size(); i++) {
+        if (i > 0)
+          sb.append(", ");
+        
+        sb.append(values.get(i));
+      }
+      
+      sb.append("]}");
+      return sb.toString();
+    }
+  }
+  
+  /**
+   * Bundles a single value in a facet query result, with the number of matching events which had that
+   * value.
+   */
+  public static class ValueAndCount {
+    public final Object value;
+    
+    public final long count;
+    
+    public ValueAndCount(Object value, long count) {
+      this.value = value;
+      this.count = count;
+    }
+    
+    public ValueAndCount(JSONObject json) {
+      this(json.get("value"), convertToLong(json.get("count")));
+    }
+    
+    @Override public String toString() {
+      return "{" + value + ": " + count + "}";
+    }
+  }
+  
+  /**
    * Encapsulates the result of executing a timeseries query.
    */
   public static class TimeseriesQueryResult {
@@ -575,7 +719,7 @@ public class QueryService extends ScalyrService {
       
       StringBuilder sb = new StringBuilder();
       sb.append("{TimeseriesQueryResult: ");
-      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "") 
+      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "")
           + ", execution time " + executionTime + " ms, values [");
       
       for (int i = 0; i < values.size(); i++) {

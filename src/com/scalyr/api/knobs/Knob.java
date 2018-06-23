@@ -17,12 +17,6 @@
 
 package com.scalyr.api.knobs;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
-
 import com.scalyr.api.Callback;
 import com.scalyr.api.Converter;
 import com.scalyr.api.ScalyrDeadlineException;
@@ -31,6 +25,12 @@ import com.scalyr.api.internal.Logging;
 import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.logs.Severity;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Encapsulates a specific entry in a JSON-format configuration file.
@@ -235,8 +235,8 @@ public class Knob {
         uncachedFetchCount++;
         if (uncachedFetchCount >= TuningConstants.KNOB_CACHE_THRESHOLD) {
           // Ensure that we have a fileListener, so that we can update our value if the configuration
-          // file(s) change. We don't this unless the knob is fetched repeatedly, because the fileListener
-          // will prevent this Knob object from ever being garbage collected. !!!
+          // file(s) change. We don't do this unless the knob is fetched repeatedly, because the fileListener
+          // will prevent this Knob object from ever being garbage collected.
           ensureFileListener();
           ensuredFileListener = true;
         }
@@ -332,6 +332,22 @@ public class Knob {
     updateListeners.remove(updateListener);
     return this;
   }
+
+
+  /**
+   * No-op developer convenience/hygiene method: when defining a new Knob that
+   * we ought to cleanup at some point, add this method to the Knob declaration:
+   *
+   * ```
+   * final Knob.Boolean useOldImplementation = new Knob.Boolean("useOldImplementation", false).expireHint("12/15/2017");
+   * ```
+   *
+   * @param dateStr after which we may want to pull this knob.  Not currently parsed.
+   * @return self for chaining
+   */
+  public Knob expireHint(java.lang.String dateStr) {
+    return this;
+  }
   
   /**
    * Subclass of Knob which is specialized for Integer values.
@@ -347,6 +363,10 @@ public class Knob {
     
     @Override public java.lang.Integer getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toInteger(super.getWithTimeout(timeoutInMs));
+    }
+
+    @Override public Integer expireHint(java.lang.String dateStr) {
+      return this;
     }
   }
   
@@ -365,6 +385,10 @@ public class Knob {
     @Override public java.lang.Long getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toLong(super.getWithTimeout(timeoutInMs));
     }
+
+    @Override public Long expireHint(java.lang.String dateStr) {
+      return this;
+    }
   }
   
   /**
@@ -381,6 +405,10 @@ public class Knob {
     
     @Override public java.lang.Double getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toDouble(super.getWithTimeout(timeoutInMs));
+    }
+
+    @Override public Double expireHint(java.lang.String dateStr) {
+      return this;
     }
   }
   
@@ -399,6 +427,10 @@ public class Knob {
     @Override public java.lang.Boolean getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toBoolean(super.getWithTimeout(timeoutInMs));
     }
+
+    @Override public Boolean expireHint(java.lang.String dateStr) {
+      return this;
+    }
   }
   
   /**
@@ -415,6 +447,10 @@ public class Knob {
     
     @Override public java.lang.String getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toString(super.getWithTimeout(timeoutInMs));
+    }
+
+    @Override public String expireHint(java.lang.String dateStr) {
+      return this;
     }
   }
 }

@@ -17,9 +17,10 @@
 
 package com.scalyr.api.json;
 
-import java.nio.charset.Charset;
-
 import com.scalyr.api.internal.ScalyrUtil;
+
+import java.nio.charset.Charset;
+import java.util.Arrays;
 
 public class JSONParser {
   private static final Charset utf8 = Charset.forName("UTF-8");
@@ -53,7 +54,11 @@ public class JSONParser {
     } else if (c == '[') {
       return parseArray();
     } else if (c == '"') {
-      return parseStringWithConcatenation();
+      if (consumeRepeatedChars('"', 2)) {
+        return parseTripleQuotedString();
+      } else {
+        return parseStringWithConcatenation();
+      }
     } else if (c == 't') {
       match("true", "unknown identifier");
       return true;
@@ -66,7 +71,7 @@ public class JSONParser {
     } else if (c == '-' || (c >= '0' && c <= '9')) {
       return parseNumber(c);
     } else if (c == '`') {
-      return parseByteArray();
+      return parseLengthPrefixedValue();
     } else if (c == '}') {
       error("'}' can only be used to end an object");
       return null; // never reached
@@ -257,7 +262,37 @@ public class JSONParser {
     String raw = new String(stringBytes, utf8);
     return processEscapes(raw);
   }
-  
+
+  /**
+   * Parse a string literal within triple quotes. The '"""' has already been scanned.
+   */
+  private String parseTripleQuotedString() {
+    int startPos = scanner.getPos();
+    int len = 0;
+    while (true) {
+      if (scanner.atEnd())
+        throw new JsonParseException("triple quoted string literal not terminated", startPos-1, lineNumberForBytePos(scanner.buffer, startPos-1));
+
+      int c = scanner.readUByte();
+      if (c == '"' && consumeRepeatedChars('"', 2)) {
+        // handle any extra quotes at the end of the triple-quoted string in accordance with the HOCON spec.
+        // example: """foo"""" should result in the four-character string foo"
+        while (!scanner.atEnd() && scanner.peekUByte() == '"') {
+          scanner.readUByte();
+          len++;
+        }
+        break;
+      }
+
+      len++;
+    }
+
+    byte[] stringBytes = new byte[len];
+    scanner.readBytesFromBuffer(startPos, stringBytes, 0, len);
+
+    return new String(stringBytes, utf8);
+  }
+
   /**
    * Given the raw contents of a raw string literal, process any backslash sequences.
    */
@@ -381,11 +416,19 @@ public class JSONParser {
   /**
    * Parse a byte array (Scalyr extension to the JSON format). The '`' has already been scanned.
    */
-  private byte[] parseByteArray() {
-    match("`b", null);
-    
-    int length = scanner.readInt();
-    return scanner.readBytes(length);
+  private Object parseLengthPrefixedValue() {
+    int c = scanner.peekUByteOrFlag();
+    if (c == 's') {
+      match("`s", null);
+
+      int length = scanner.readInt();
+      return new String(scanner.readBytes(length), utf8);
+    } else {
+      match("`b", null);
+
+      int length = scanner.readInt();
+      return scanner.readBytes(length);
+    }
   }
   
   /**
@@ -443,6 +486,28 @@ public class JSONParser {
       
       return c;
     }
+  }
+
+  /**
+   * Attempts to consume a repetition of the specified ubyte.  The exact next `count` characters in the stream
+   * must equal the expected ubyte value.  No whitespace is allowed in the repetition.
+   *
+   * @param expectedUByte  The expected ubyte value.
+   * @param count  The number of characters there should be.
+   * @return  True if there are exactly `count` characters equal to `expectedUByte` next in the stream (and those
+   *     characters are consumed).  Otherwise, false is returned and the position is unchanged.
+   */
+  private boolean consumeRepeatedChars(int expectedUByte, int count) {
+    for (int i = 0; i < count; ++i) {
+      if (expectedUByte != scanner.peekUByteOrFlag(i)) {
+        return false;
+      }
+    }
+
+    for (int i = 0; i < count; ++i) {
+      scanner.readUByte();
+    }
+    return true;
   }
   
   /**
@@ -549,10 +614,25 @@ public class JSONParser {
     public int peekUByteOrFlag() {
       if (pos >= maxPos)
         return -1;
-      
+
       return buffer[pos] & 255;
     }
-    
+
+    /**
+     * Return the a byte, unsigned, without consuming it. If the byte is past the end of the stream, return -1.
+     *
+     * @param offset  The offset to read the byte from, relative to the current location.
+     */
+    public int peekUByteOrFlag(int offset) {
+      if (pos + offset < 0)
+        return -1;
+
+      if (pos + offset >= maxPos)
+        return -1;
+
+      return buffer[pos + offset] & 255;
+    }
+
     public int readInt() {
       checkReadSize(4);
       

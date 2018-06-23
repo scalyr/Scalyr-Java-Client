@@ -17,23 +17,27 @@
 
 package com.scalyr.api.logs;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
+
 
 /**
  * An EventAttributes object encapsulates named attributes to be associated with an event.
  * It can store Boolean, String, or numeric values. All other data types are converted to
  * String.
+ *
+ * Thread-safe, except for equals method
  */
 public class EventAttributes {
-  final Map<String, Object> values = new HashMap<String, Object>();
+  private final Map<String, Object> values = new HashMap<String, Object>();
   
   /**
    * Construct an empty attribute list.
@@ -157,7 +161,15 @@ public class EventAttributes {
   public EventAttributes(EventAttributes source) {
     addAll(source);
   }
-  
+
+  /**
+   * Construct object from entry set.
+   */
+  public EventAttributes(List<Entry<String, Object>> entrySet) {
+    for (Map.Entry<String, Object> entry : entrySet)
+      put(entry.getKey(), entry.getValue());
+  }
+
   /**
    * Copy all attributes from the given object to this object. In case of conflicts,
    * attributes from objectToCopy overwrite the existing attributes in this object.
@@ -166,9 +178,11 @@ public class EventAttributes {
    * Return this object.
    */
   public EventAttributes addAll(EventAttributes source) {
-    for (Map.Entry<String, Object> entry : source.values.entrySet())
-      put(entry.getKey(), entry.getValue());
-    
+    synchronized (source.values) {
+      for (Map.Entry<String, Object> entry : source.values.entrySet())
+        put(entry.getKey(), entry.getValue());
+    }
+
     return this;
   }
   
@@ -179,10 +193,12 @@ public class EventAttributes {
    * Return this object.
    */
   public EventAttributes underwriteFrom(EventAttributes source) {
-    for (Map.Entry<String, Object> entry : source.values.entrySet())
-      if (!containsKey(entry.getKey()))
-        put(entry.getKey(), entry.getValue());
-    
+    synchronized (source.values) {
+      for (Map.Entry<String, Object> entry : source.values.entrySet())
+        if (!containsKey(entry.getKey()))
+          put(entry.getKey(), entry.getValue());
+    }
+
     return this;
   }
   
@@ -190,7 +206,20 @@ public class EventAttributes {
    * Return the value of the specified attribute, or null if the attribute is not defined.
    */
   public Object get(String key) {
-    return values.get(key);
+
+    synchronized (values) {
+      return values.get(key);
+    }
+  }
+
+  /**
+   * Return the value of the specified attribute, or `defaultValue` if the attribute is not defined.
+   */
+  public Object getOr(String key, Object defaultValue) {
+    synchronized (values) {
+      Object ret = values.get(key);
+      return ret == null ? defaultValue : ret;
+    }
   }
   
   /**
@@ -203,7 +232,9 @@ public class EventAttributes {
    * @param value The attribute value.
    */
   public EventAttributes put(String key, Object value) {
-    values.put(key, toValueType(value));
+    synchronized (values) {
+      values.put(key, toValueType(value));
+    }
     return this;
   }
   
@@ -211,7 +242,10 @@ public class EventAttributes {
    * Return true if a value is stored for the specified attribute.
    */
   public boolean containsKey(String key) {
-    return values.containsKey(key);
+
+    synchronized (values) {
+      return values.containsKey(key);
+    }
   }
   
   /**
@@ -246,19 +280,21 @@ public class EventAttributes {
     // We return our attributes in alphabetical order, for consistency in tests.
     StringBuilder sb = new StringBuilder();
     sb.append('{');
-    
-    List<String> keys = new ArrayList<String>(values.keySet());
-    Collections.sort(keys);
-    for (int i = 0; i < keys.size(); i++) {
-      if (i > 0)
-        sb.append(", ");
-      
-      String key = keys.get(i);
-      sb.append(key);
-      sb.append('=');
-      sb.append(values.get(key));
+
+    synchronized (values) {
+      List<String> keys = new ArrayList<String>(values.keySet());
+      Collections.sort(keys);
+      for (int i = 0; i < keys.size(); i++) {
+        if (i > 0)
+          sb.append(", ");
+
+        String key = keys.get(i);
+        sb.append(key);
+        sb.append('=');
+        sb.append(values.get(key));
+      }
     }
-    
+
     sb.append('}');
     return sb.toString();
   }
@@ -266,6 +302,7 @@ public class EventAttributes {
   /**
    * We implement equals() in a manner that respects MATCH_ANY -- see MATCH_ANY for details. We also treat Integers and
    * Longs as equivalent; this is handy in tests.
+   * This method is not thread-safe
    */
   @Override public boolean equals(Object obj) {
     if (obj == this)
@@ -273,11 +310,12 @@ public class EventAttributes {
     
     if (getClass() != obj.getClass())
       return false;
-    
+
     EventAttributes other = (EventAttributes) obj;
+
     if (values.size() != other.values.size())
       return false;
-    
+
     // We compare values one at a time, rather than invoking values.equals(), to implement MATCH_ANY and other
     // special features (see equivalentValues()).
     for (Map.Entry<String, Object> entry : values.entrySet()) {
@@ -296,7 +334,7 @@ public class EventAttributes {
         }
       }
     }
-    
+
     return true;
   }
   
@@ -327,23 +365,47 @@ public class EventAttributes {
   /**
    * Special value which EventAttributes.equals() treats as matching any non-null value. Useful in tests.
    */
-  public static String MATCH_ANY = "__MATCH_ANY_VALUE__";
+  public static final String MATCH_ANY = "__MATCH_ANY_VALUE__";
   
   @Override public int hashCode() {
-    return values.hashCode();
+    synchronized (values) {
+      return values.hashCode();
+    }
   }
   
   /**
-   * Return all attribute names.
+   * Return copy of all attribute names.
    */
   public Collection<String> getNames() {
-    return values.keySet();
+    synchronized (values) {
+      return new HashSet<>(values.keySet());
+    }
   }
   
   /**
-   * Return all attributes -- a collection of {attribute name, attribute value} pairs.
+   * Return shallow copy of all attributes -- a collection of {attribute name, attribute value} pairs.
    */
   public Collection<Map.Entry<String, Object>> getEntries() {
-    return values.entrySet();
+    synchronized (values) {
+      return new HashMap<>(values).entrySet();
+    }
+  }
+
+  /** Return a new map containing all the same keys, and with all values coerced to strings (via `toString`). */
+  public Map<String, String> coerceToStringMap() {
+
+    synchronized (values) {
+      return values.entrySet().stream()
+              .collect(Collectors.toMap(entry -> entry.getKey(), entry -> String.valueOf(entry.getValue())));
+    }
+  }
+
+  /**
+   * Return number of event attributes
+   */
+  public int size() {
+    synchronized (values) {
+      return values.size();
+    }
   }
 }

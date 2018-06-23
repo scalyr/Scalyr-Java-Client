@@ -186,11 +186,8 @@ class HostedConfigurationFile extends ConfigurationFile {
             } else {
               // After any sort of error or backoff response, retry after 5 seconds, successively
               // doubling up to a maximum of 1 minute. 
-              if (retryInterval < TuningConstants.MINIMUM_FETCH_INTERVAL_AFTER_ERROR)
-                retryInterval = TuningConstants.MINIMUM_FETCH_INTERVAL_AFTER_ERROR;
-              else
-                retryInterval = Math.min(retryInterval*2, TuningConstants.MAXIMUM_FETCH_INTERVAL);
-              
+              retryInterval = increaseBackoff(retryInterval);
+
               if (status.startsWith("error/server/backoff")) {
                 Logging.log(Severity.warning, Logging.tagServerBackoff,
                     "Configuration server returned status [" + status + "], message [" +
@@ -203,6 +200,10 @@ class HostedConfigurationFile extends ConfigurationFile {
               }
             }
           } catch (Exception ex) {
+            // After any sort of error or backoff response, retry after 5 seconds, successively
+            // doubling up to a maximum of 1 minute.
+            retryInterval = increaseBackoff(retryInterval);
+
             Logging.log(Severity.warning, Logging.tagServerError,
                 "Error communicating with the configuration server(s) [" +
                 knobService.getServerAddresses() + "] to fetch file [" + getPathname() + "]",
@@ -219,6 +220,14 @@ class HostedConfigurationFile extends ConfigurationFile {
             expectedVersion = (fileState != null ? fileState.version : null);
           }
         }
-      }});
+      }
+
+      private int increaseBackoff(int retryInterval) {
+        if (retryInterval < TuningConstants.MINIMUM_FETCH_INTERVAL_AFTER_ERROR)
+          return TuningConstants.MINIMUM_FETCH_INTERVAL_AFTER_ERROR;
+        else
+          return Math.min(retryInterval*2, TuningConstants.MAXIMUM_FETCH_INTERVAL);
+      }
+    });
   }
 }

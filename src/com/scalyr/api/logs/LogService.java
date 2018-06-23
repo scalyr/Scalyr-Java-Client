@@ -39,8 +39,8 @@ public class LogService extends ScalyrService {
     
     setServerAddress("https://log.scalyr.com");
   }
-  
-  public @Override synchronized LogService setServerAddress(String value) {
+
+  @Override public synchronized LogService setServerAddress(String value) {
     return (LogService) super.setServerAddress(value);
   }
   

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.function.BiConsumer;
 
 import com.scalyr.api.TuningConstants;
 import com.scalyr.api.internal.Logging;
@@ -47,6 +48,23 @@ public abstract class Gauge {
   public abstract Object sample();
   
   /**
+   * Record the current value for this gauge.
+   * 
+   * Most Gauges will not need to override this method. The default implementation calls sample() and then records the
+   * result, adding the specified attributes. A Gauge can override this to record multiple values.
+   * 
+   * @param attributes Attributes under which this gauge was registered.
+   */
+  public void recordValue(EventAttributes attributes) {
+    Object value = sample();
+    if (value != null) {
+      EventAttributes attributes_ = new EventAttributes(attributes);
+      attributes_.put("value", value);
+      Events.info(attributes_);
+    }
+  }
+  
+  /**
    * Timer used to sample gauges events. Allocated when the first gauge is registered.
    */
   private static Timer sampleTimer = null;
@@ -56,6 +74,16 @@ public abstract class Gauge {
    * Holds an entry for each registered gauge.
    */
   private static Map<Gauge, EventAttributes> registeredGauges = new HashMap<Gauge, EventAttributes>(); 
+
+  /**
+   * Run the given action on all registered gauges (and their attributes).  Thread safe, but (like any map iterator)
+   * `action` should not deregister any gauges or you risk a `ConcurrentModificationException`.
+   */
+  public static void forEach(BiConsumer<Gauge, EventAttributes> action) {
+    synchronized (registeredGauges) {
+      registeredGauges.forEach(action);
+    }
+  }
   
   /**
    * Register a gauge. We will record the gauge's value once every 30 seconds, associating
@@ -102,12 +130,7 @@ public abstract class Gauge {
     
     for (Map.Entry<Gauge, EventAttributes> entry : entries) {
       try {
-        Object value = entry.getKey().sample();
-        if (value != null) {
-          EventAttributes attributes = new EventAttributes(entry.getValue());
-          attributes.put("value", value);
-          Events.info(attributes);
-        }
+        entry.getKey().recordValue(entry.getValue());
       } catch (Exception ex) {
         Logging.log(Severity.warning, Logging.tagGaugeThrewException,
             "Exception in Gauge [" + entry.getKey() + "] (attributes " + entry.getValue() + ")", ex);

@@ -20,7 +20,7 @@ package com.scalyr.api;
 /**
  * A generic interface for callback methods accepting a single parameter.
  */
-public abstract class Callback<T> {
+public interface Callback<T> {
   /**
    * Invoke the callback with the given parameter.
    */

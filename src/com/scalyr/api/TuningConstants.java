@@ -17,6 +17,9 @@
 
 package com.scalyr.api;
 
+import com.scalyr.api.knobs.Knob;
+import com.scalyr.api.logs.CounterGauge;
+
 /**
  * Tunable parameters.
  */
@@ -104,7 +107,13 @@ public class TuningConstants {
    * the server issues backoff responses and we begin increasing our interval.
    */
   public static final int MAX_EVENT_UPLOAD_SPACING_MS = 30000;
-  
+
+  /**
+   * If not null, then we wait at least this long after one event batch upload before
+   * initiating another, regardless of any other settings. (Measures start-to-start.)
+   */
+  public static volatile Knob.Integer adjustableEventUploadSpacingFloorMs = null;
+
   /**
    * Factor by which we adjust our upload spacing after a backoff response.
    */
@@ -184,4 +193,22 @@ public class TuningConstants {
    * knob value from then on, allowing subsequent get() calls to return instantly.
    */
   public static final int KNOB_CACHE_THRESHOLD = 100;
+
+  /**
+   * If this variable is not null and evaluates to true, then we use the Apache Commons HTTP client library
+   * in EventUploader. Otherwise we use java.net.HttpURLConnection. NOTE: using the Apache Commons library
+   * increases memory usage somewhat, as we must assemble each request in memory before transmission.
+   */
+  public static volatile Knob.Boolean useApacheHttpClientForEventUploader = null;
+
+  /**
+   * If not null, then we increment this each time we initiate a request to the Scalyr server.
+   */
+  public static volatile CounterGauge serverInvocationCounter = null;
+
+  /**
+   * If not null, then each time we complete a request to the Scalyr server (successfully or otherwise), we increment this by
+   * the number of seconds spent waiting on the request.
+   */
+  public static volatile CounterGauge serverInvocationTimeCounterSecs = null;
 }

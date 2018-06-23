@@ -19,24 +19,44 @@ package com.scalyr.api.knobs.util;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.scalyr.api.Callback;
+import com.scalyr.api.json.JSONArray;
+import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.knobs.ConfigurationFile;
 import com.scalyr.api.knobs.Knob;
 
 /**
- * A Whitelist provides a quick and efficient way to test whether a given string appears
- * in a comma-delimited list of strings stored in a Knob. The following syntax is supported:
- * 
- *   x, y, z  -- One or more options, separated by commas. Leading / trailing whitespace from
- *               each option is discarded.
- *   ^x, y, z -- The initial caret indicates that this is a blacklist rather than a whitelist.
- *               All values *not* appearing in the list are accepted.
- *   *           Wildcard: all values are accepted.
- *   ^*          Negative wildcard: no values are accepted.
+
+A Whitelist provides a quick and efficient way to test whether a given string appears
+in an array of string values (or a comma-delimited list of strings) stored in a Knob.
+The following syntax is supported:
+
+```
+["x", "y", "z"]  -- One or more options. Leading / trailing whitespace from each option is discarded.
+["^", "x", "y"]  -- The initial caret indicates that this is a blacklist rather than a whitelist.
+                    Must appear on its own as the first element in the array.
+                    All values *not* appearing in the list are accepted.
+["*"]            -- Wildcard: all values are accepted.
+["^*"]           -- Negative wildcard: no values are accepted.
+```
+
+Legacy:
+
+```
+"x, y, z"  -- One or more options, separated by commas. Leading / trailing whitespace from
+              each option is discarded.
+"^x, y, z" -- The initial caret indicates that this is a blacklist rather than a whitelist.
+              All values *not* appearing in the list are accepted.
+"*"        -- Wildcard: all values are accepted.
+"^*"       -- Negative wildcard: no values are accepted.
+```
+
  */
 public class Whitelist {
-  private final Knob.String whitelistKnob;
+  private final Knob whitelistKnob;
   
   /**
    * Holds the result of parsing the most recent knob value. Null until first use.
@@ -55,25 +75,47 @@ public class Whitelist {
    * null. Synchronize access on the Whitelist instance.
    */
   private boolean negated;
-  
+
+
   /**
-   * Construct a Whitelist based on the given Knob. The Knob should contain a comma-
-   * delimited list of strings. An empty or missing Knob is treated as an empty list.
-   * Leading or trailing whitespace, and whitespace adjacent to commas, is ignored. See our
-   * class comment for a discussion of wildcards ('*') and negation ('^').
+   * Used by other constructors.
    */
-  public Whitelist(Knob.String whitelistKnob) {
+  private Whitelist(Knob whitelistKnob) {
     this.whitelistKnob = whitelistKnob;
   }
-  
+
   /**
-   * Construct a Whitelist, based on a Knob with the given constructor arguments. The Knob should contain
-   * a comma-delimited list of strings. An empty or missing Knob is treated as an empty list.
-   * Leading or trailing whitespace, and whitespace adjacent to commas, is ignored. See our
-   * class comment for a discussion of wildcards ('*') and negation ('^').
+   * Construct a Whitelist based on a Knob. The Knob can contain either an array of string values or
+   * a comma-delimited list of strings. An empty or missing Knob is treated as an empty list. Leading
+   * or trailing whitespace, and whitespace adjacent to commas, is ignored. See our class comment for
+   * a discussion of wildcards ('*') and negation ('^').
+   *
+   * @param key            The knob's key.
+   * @param defaultValue   Default value to use if no value for the knob is specified.
    */
   public Whitelist(java.lang.String key, String defaultValue, ConfigurationFile ... files) {
-    this(new Knob.String(key, defaultValue, files));
+    this(new Knob(key, defaultValue, files));
+  }
+
+
+  /**
+   * No-op developer convenience/hygiene method: when defining a new Whitelist that
+   * we ought to cleanup at some point, add this method to the Whitelist declaration:
+   *
+   * ```
+   * final Whitelist accountsUsingOldImplementation = new Whitelist("accountsUsingOldImplementation", "^*").expireHint("12/15/2017");
+   * ```
+   *
+   * @param dateStr after which we may want to pull this knob.  Not currently parsed.
+   * @return self for chaining
+   */
+  public Whitelist expireHint(String dateStr) {
+    return this;
+  }
+
+  /** Convenience wrapper for `isInWhitelist(enumVal.name())`. */
+  public synchronized boolean isInWhitelist(Enum<?> enumVal) {
+    return isInWhitelist(enumVal.name());
   }
   
   /**
@@ -124,15 +166,56 @@ public class Whitelist {
     whitelistSet.clear();
     wildcard = false;
     negated = false;
-    
-    String knobValue = whitelistKnob.get();
-    if (knobValue != null) {
-      knobValue = knobValue.trim();
+
+    Object knobValueObj = whitelistKnob.get();
+
+    if (knobValueObj instanceof JSONArray) {
+      JSONArray array = (JSONArray) knobValueObj;
+      if (!array.isEmpty()) {
+        String first = null;
+        Object firstObj = array.get(0);
+        if (firstObj instanceof JSONObject) {
+          JSONObject obj = (JSONObject) firstObj;
+          Object objValue = obj.get("value");
+          if (objValue != null) first = objValue.toString().trim();
+        } else {
+          first = array.get(0).toString().trim();
+        }
+
+        // if first is null (which is possible) then skipObject will end up being null and therefore == first
+
+        if (first != null && first.matches("^\\^\\s*\\*$")) {  // (carat, any possible whitespace, asterisk) = blacklist everything
+          negated = true;
+          wildcard = true;
+        } else if ("^".equals(first)) {  // blacklist
+          negated = true;
+        } else if ("*".equals(first)) {  // wildcard
+          wildcard = true;
+        }
+        String skipObject = negated || wildcard ? first : null;
+
+        for (Object item: array) {
+          if (item != skipObject) {
+            if (item instanceof JSONObject) {
+              JSONObject obj = (JSONObject) item;
+              Object value = obj.getOrDefault("value", null);
+              if (value != null) {
+                whitelistSet.add(value.toString().trim());
+              }
+            } else {
+              whitelistSet.add(item.toString().trim());
+            }
+          }
+        }
+      }
+    } else if (knobValueObj != null) {
+      String knobValue = knobValueObj.toString().trim();
+      // if ^ is the first real character of the string, it's a blacklist
       if (knobValue.startsWith("^")) {
         negated = true;
         knobValue = knobValue.substring(1).trim();
       }
-      
+
       if (knobValue.equals("*")) {
         wildcard = true;
       } else {
@@ -141,6 +224,6 @@ public class Whitelist {
         }
       }
     }
-  }  
+  }
 
 }

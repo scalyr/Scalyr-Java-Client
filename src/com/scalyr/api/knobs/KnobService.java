@@ -17,12 +17,12 @@
 
 package com.scalyr.api.knobs;
 
-import java.io.File;
-
 import com.scalyr.api.ScalyrException;
 import com.scalyr.api.ScalyrNetworkException;
 import com.scalyr.api.internal.ScalyrService;
 import com.scalyr.api.json.JSONObject;
+
+import java.io.File;
 
 /**
  * Encapsulates the raw HTTP-level API to the Knobs service.
@@ -37,8 +37,8 @@ public class KnobService extends ScalyrService {
   public KnobService(String apiToken) {
     super(apiToken);
   }
-  
-  public @Override synchronized KnobService setServerAddress(String value) {
+
+  @Override public synchronized KnobService setServerAddress(String value) {
     return (KnobService) super.setServerAddress(value);
   }
   
@@ -67,26 +67,20 @@ public class KnobService extends ScalyrService {
    * @param expectedVersion Should normally be null. If not null, equal to the file's current version
    *     number, then the content field will be omitted from the response. Saves bandwidth when
    *     you are merely checking to see whether a file has changed since a previous known version.
-   * @param waitTime If not null, and expectedVersion is not null, and the file matches expectedVersion,
-   *     then this request will not complete until the file is modified or waitTime seconds have
-   *     elapsed. (Note: this is not honored absolutely -- sometimes, the server may return a result
-   *     prior to waitTime even if the file has not changed.)
+   * @param obsolete_waitTime Obsolete parameter (ignored).
    * 
    * @return The response from the server. See <a href='https://www.scalyr.com/help/api'>scalyr.com/help/api</a>.
    * 
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
-  public String getFile(String path, Long expectedVersion, Integer waitTime)
+  public String getFile(String path, Long expectedVersion, Integer obsolete_waitTime)
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("path", path);
     if (expectedVersion != null)
       parameters.put("expectedVersion", expectedVersion);
-    
-    if (waitTime != null)
-      parameters.put("waitTime", waitTime);
     
     JSONObject parsed = invokeApi("getFile", parameters);
     if (parsed != null)

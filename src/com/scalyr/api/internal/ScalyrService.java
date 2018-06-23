@@ -17,27 +17,33 @@
 
 package com.scalyr.api.internal;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.SocketTimeoutException;
-import java.net.URL;
-import java.util.Random;
-
 import com.scalyr.api.ScalyrException;
 import com.scalyr.api.ScalyrNetworkException;
+import com.scalyr.api.ScalyrServerException;
 import com.scalyr.api.TuningConstants;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.json.JSONParser;
 import com.scalyr.api.json.JSONParser.ByteScanner;
 import com.scalyr.api.logs.Severity;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.util.Random;
+
 /**
  * Base class for encapsulating the raw HTTP-level API to a Scalyr service.
  */
 public abstract class ScalyrService {
+  /**
+   * If this is a positive value N, then for a random sample of one in N server invocations, we log the response time and other
+   * parameters at "info" (which is typically written to a log) rather than "fine" (which is typically discarded).
+   */
+  public static volatile int latencyRecordingFraction = 0;
+
   /**
    * Server URLs, each including a trailing slash. Synchronize access.
    */
@@ -53,6 +59,18 @@ public abstract class ScalyrService {
    * API token we pass in all requests to the server.
    */
   protected final String apiToken;
+  
+  /**
+   * If true, then we set connection="close" on each request. This avoids any possibility of problems with the HTTP
+   * client failing to correctly track the connection state.
+   */
+  public boolean closeConnections = true;
+
+  /**
+   * If true, then we explicitly disconnect after each web request. Defaults to false, but can be set to true
+   * if leaving the connection open turns out to contribute to OOM problems.
+   */
+  public boolean explicitlyDisconnect = false;
   
   /**
    * Construct a ScalyrService.
@@ -216,6 +234,11 @@ public abstract class ScalyrService {
    */
   public static class RpcOptions {
     /**
+     * If not empty/null, then we add a "?" and this string to the URL. Should be of the form "name=value" or "name=value&amp;name=value".
+     */
+    public String queryParameters;
+
+    /**
      * HTTP connextion timeout (see HttpURLConnection.setConnectTimeout).
      */
     public int connectionTimeoutMs = TuningConstants.HTTP_CONNECT_TIMEOUT_MS;
@@ -243,12 +266,12 @@ public abstract class ScalyrService {
     public JSONObject response;
     
     /**
-     * Length of the serialized JSON request, in bytes.
+     * Length of the serialized JSON request, in bytes. May not reflect compression.
      */
     public int requestLength;
     
     /**
-     * Length of the serialized JSON response, in bytes.
+     * Length of the serialized JSON response, in bytes. May not reflect compression.
      */
     public int responseLength;
     
@@ -257,97 +280,171 @@ public abstract class ScalyrService {
      */
     public int latencyMs;
   }
-  
+
   /**
    * Invoke serverAddress/methodName on the server, sending the specified parameters as the request
    * body. Return the (JSON-format) response.
-   * 
+   *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
   protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters,
       RpcOptions options) {
-    HttpURLConnection connection = null;  
+    AbstractHttpClient httpClient = null;
+
+    long timeBeforeCreatingClient = System.nanoTime();
+    long timeBeforeRequestingResponse = -1;
+    long timeAfterReceivingResponse = -1;
+
     try {
-      // Send the request.
-      long startTimeMs = ScalyrUtil.currentTimeMillis();
-      URL url = new URL(serverAddress + methodName);
-      connection = (HttpURLConnection) url.openConnection();
-      connection.setRequestMethod("POST");
-      connection.setUseCaches(false);
-      connection.setDoInput(true);
-      connection.setConnectTimeout(options.connectionTimeoutMs);
-      connection.setReadTimeout(options.readTimeoutMs);
-      
       CountingOutputStream countingStream = new CountingOutputStream();
       parameters.writeJSONBytes(countingStream);
       int requestLength = countingStream.bytesWritten;
-      
-      connection.setRequestProperty("Content-Type", "application/json");
-      connection.setRequestProperty("Content-Length", "" + requestLength);
-      connection.setDoOutput(true);
-      
-      OutputStream output = connection.getOutputStream();
-      parameters.writeJSONBytes(output);
-      output.flush();
-      
-      // We no longer explicitly close, so that HTTP keepalive can function.
-      // output.close();
-      
-      // Retrieve the response.
-      int responseCode = connection.getResponseCode();
-      
-      InputStream input = connection.getInputStream();
-      byte[] rawResponse = readEntireStream(input);
-      
-      // We no longer explicitly close, so that HTTP keepalive can function.
-      // reader.close();
-      
-      int runtimeMs = (int) (ScalyrUtil.currentTimeMillis() - startTimeMs);
-      Logging.log(Severity.fine, Logging.tagServerCommunication,
-          serverAddress + "/" + methodName + ": "
-          + runtimeMs + " ms, "
-          + requestLength + " bytes sent, "
-          + rawResponse.length + " bytes received, "
-          + "response status " + responseCode
-          );
-      
-      if (responseCode != 200) {
-        // TODO: log StringUtil.noisyTruncate(response.responseBody.trim(), 1000));
-        // also do this in the "Malformed response" case
-        throw new ScalyrNetworkException("Scalyr server returned error code " + responseCode);
-      }
-      
-      ByteScanner responseScanner = new ByteScanner(rawResponse);
-      Object responseJson = new JSONParser(responseScanner).parseValue();
-      if (responseJson instanceof JSONObject) {
-        Object status = ((JSONObject)responseJson).get("status");
-        Logging.log(Severity.finer, Logging.tagServerCommunication,
-            "Response status [" + (status == null ? "(none)" : status) + "]"
+
+      // Send the request.
+      long startTimeMs = ScalyrUtil.currentTimeMillis();
+      String urlString = serverAddress + methodName;
+      if (options.queryParameters != null && !"".equals(options.queryParameters))
+        urlString += "?" + options.queryParameters;
+
+      URL url = new URL(urlString);
+
+      if (TuningConstants.serverInvocationCounter != null)
+        TuningConstants.serverInvocationCounter.increment();
+
+      try {
+        if (TuningConstants.useApacheHttpClientForEventUploader != null && TuningConstants.useApacheHttpClientForEventUploader.get()) {
+          ByteArrayOutputStream requestBuffer = new ByteArrayOutputStream();
+          parameters.writeJSONBytes(requestBuffer);
+
+          byte[] byteArray = requestBuffer.toByteArray();
+          httpClient = new ApacheHttpClient(url, requestLength, closeConnections, options, byteArray, byteArray.length,
+                                            "application/json", null);
+        } else {
+          httpClient = new JavaNetHttpClient(url, requestLength, closeConnections, options, "application/json", null);
+
+          OutputStream output = httpClient.getOutputStream();
+          parameters.writeJSONBytes(output);
+          output.flush();
+          output.close();
+        }
+
+        // Retrieve the response.
+        timeBeforeRequestingResponse = System.nanoTime();
+        int responseCode = httpClient.getResponseCode();
+        timeAfterReceivingResponse = System.nanoTime();
+
+        byte[] rawResponse;
+
+        try {
+          InputStream input = httpClient.getInputStream();
+          rawResponse = readEntireStream(input);
+        } finally {
+          httpClient.finishedReadingResponse();
+        }
+
+        // Log a random sample of server response times.
+        Severity severity = Severity.fine;
+        if (latencyRecordingFraction == 1) {
+          severity = Severity.info;
+        } else if (latencyRecordingFraction > 0) {
+          synchronized (random) {
+            if (random.nextInt(latencyRecordingFraction) == 0) {
+              severity = Severity.info;
+            }
+          }
+        }
+
+        int runtimeMs = (int) (ScalyrUtil.currentTimeMillis() - startTimeMs);
+        Logging.log(severity, Logging.tagServerCommunication,
+            serverAddress + "/" + methodName + ": "
+            + runtimeMs + " ms, "
+            + requestLength + " bytes sent, "
+            + rawResponse.length + " bytes received, "
+            + "response status " + responseCode
             );
-        
-        InvokeApiResult result = new InvokeApiResult();
-        result.requestLength = requestLength;
-        result.responseLength = responseScanner.getPos();
-        result.response = (JSONObject) responseJson;
-        result.latencyMs = runtimeMs;
-        return result;
-      } else {
-        throw new ScalyrException("Malformed response from Scalyr server");
+
+        if (responseCode != 200) {
+          // TODO: log StringUtil.noisyTruncate(response.responseBody.trim(), 1000));
+          // also do this in the "Malformed response" case
+          throw new ScalyrNetworkException("Scalyr server returned error code " + responseCode);
+        }
+
+        ByteScanner responseScanner = new ByteScanner(rawResponse);
+        Object responseObj = new JSONParser(responseScanner).parseValue();
+        if (responseObj instanceof JSONObject) {
+          JSONObject responseJson = (JSONObject)responseObj;
+          Object status = responseJson.get("status");
+          Logging.log(Severity.finer, Logging.tagServerCommunication,
+              "Response status [" + (status == null ? "(none)" : status) + "]"
+              );
+
+          throwIfErrorStatus(responseJson);
+
+          InvokeApiResult result = new InvokeApiResult();
+          result.requestLength = requestLength;
+          result.responseLength = responseScanner.getPos();
+          result.response = responseJson;
+          result.latencyMs = runtimeMs;
+          return result;
+        } else {
+          throw new ScalyrException("Malformed response from Scalyr server");
+        }
+
+      } finally {
+        if (TuningConstants.serverInvocationTimeCounterSecs != null) {
+          TuningConstants.serverInvocationTimeCounterSecs.increment((ScalyrUtil.currentTimeMillis() - startTimeMs) / 1000.0);
+        }
       }
     } catch (Exception ex) {
-      if (ex instanceof SocketTimeoutException)
-        throw new ScalyrNetworkException("Timeout while communicating with Scalyr server", ex);
-      else
-        throw new ScalyrNetworkException("Error while communicating with Scalyr server", ex);
+      String timingDetails = "";
+      if (timeAfterReceivingResponse != -1) {
+        timingDetails = "creating client -> request response -> receive response -> now: "
+            + (timeBeforeRequestingResponse - timeBeforeCreatingClient) / 1000000 + ", "
+            + (timeAfterReceivingResponse - timeBeforeRequestingResponse) / 1000000 + ", "
+            + (System.nanoTime() - timeAfterReceivingResponse) / 1000000 + " ms";
+      } else if (timeBeforeRequestingResponse != -1) {
+        timingDetails = "creating client -> request response -> now: "
+            + (timeBeforeRequestingResponse - timeBeforeCreatingClient) / 1000000 + ", "
+            + (System.nanoTime() - timeBeforeRequestingResponse) / 1000000 + " ms";
+      } else {
+        timingDetails = "creating client -> now: "
+            + (System.nanoTime() - timeBeforeCreatingClient) / 1000000 + " ms";
+      }
+
+      if (ex instanceof SocketTimeoutException) {
+        throw new ScalyrNetworkException("Timeout while communicating with Scalyr server (" + timingDetails + ")", ex);
+      } else {
+        throw new ScalyrNetworkException("Error while communicating with Scalyr server (" + timingDetails + ")", ex);
+      }
     } finally {
-      // We no longer explicitly disconnect, so that HTTP keepalive can function. 
-      // 
-      // if (connection != null)
-      //   connection.disconnect(); 
+      if (explicitlyDisconnect && httpClient != null) {
+        httpClient.disconnect();
+      }
     }
   }
-  
+
+  public static void throwIfErrorStatus(JSONObject responseJson) {
+    Object status = responseJson.get("status");
+    Object statusCode = responseJson.get("__status");
+    if (statusCode instanceof Integer) {
+      //noinspection SillyAssignment
+      statusCode = (Long) (long) (int) (Integer) statusCode;
+    }
+    if (statusCode instanceof Long) {
+      long statusCode_ = (Long) statusCode;
+      if (statusCode_ != 200) {
+        throw new ScalyrServerException("Error response from Scalyr server: status " + statusCode_
+            + " (" + status + "), message [" + responseJson.get("message") + "]");
+      }
+    }
+
+    if (status instanceof String && ((String)status).startsWith("error")) {
+      throw new ScalyrServerException("Error response from Scalyr server: status [" + status + "], message ["
+          + responseJson.get("message") + "]");
+    }
+  }
+
   private byte[] readEntireStream(InputStream input) throws IOException {
     ByteArrayOutputStream accumulator = new ByteArrayOutputStream();
     byte[] buffer = new byte[4096];

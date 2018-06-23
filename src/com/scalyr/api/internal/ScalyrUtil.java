@@ -17,21 +17,13 @@
 
 package com.scalyr.api.internal;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Date;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -164,30 +156,48 @@ public class ScalyrUtil {
    * to perform asynchronous requests. Might also think about adding batch support to the API, so that we don't
    * need multiple outstanding requests to the server.
    */
-  public static final Executor asyncApiExecutor = Executors.newCachedThreadPool(new ThreadFactory(){
-    private final AtomicInteger threadNumber = new AtomicInteger(1);
-    @Override public Thread newThread(Runnable runnable) {
-      Thread t = new Thread(runnable, "Scalyr " + threadNumber.getAndIncrement());
-      t.setDaemon(true);
-      return t;
-    }});
+  public static ExecutorService asyncApiExecutor = createAsyncApiExecutor();
+
+  private static ExecutorService createAsyncApiExecutor() {
+    return Executors.newCachedThreadPool(new ThreadFactory(){
+      private final AtomicInteger threadNumber = new AtomicInteger(1);
+      @Override public Thread newThread(Runnable runnable) {
+        Thread t = new Thread(runnable, "Scalyr " + threadNumber.getAndIncrement());
+        t.setDaemon(true);
+        return t;
+      }});
+  };
+
+  /**
+   * Create a new asyncApiExecutor. Used in tests.
+   */
+  public static void recreateAsyncApiExecutor() {
+    asyncApiExecutor.shutdown();
+    try {
+      asyncApiExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException ex) {
+      throw new RuntimeException(ex);
+    }
+
+    asyncApiExecutor = createAsyncApiExecutor();
+  }
   
   /**
-   * Most recent value passed to setCustomTimeMs, or -1 if no setCustomTimeMs is in
+   * Most recent value passed to setCustomTimeNs, or -1 if no setCustomTimeNs is in
    * effect.
    */
-  private static final AtomicLong customTimeMs = new AtomicLong(-1);
+  private static final AtomicLong customTimeNs = new AtomicLong(-1);
   
   /**
    * Equivalent to System.currentTimeMillis(), but the return value can be overridden for
    * testing purposes. 
    */
   public static long currentTimeMillis() {
-    long custom = customTimeMs.get();
+    long custom = customTimeNs.get();
     if (custom == -1)
       return System.currentTimeMillis();
     else
-      return custom;
+      return custom / 1000000;
   }
   
   public static Date currentDate() {
@@ -197,15 +207,15 @@ public class ScalyrUtil {
   /**
    * Specify the value to be returned by subsequent calls to currentTimeMillis.
    */
-  public static void setCustomTimeMs(long value) {
-    customTimeMs.set(value);
+  public static void setCustomTimeNs(long value) {
+    customTimeNs.set(value);
   }
   
   /**
    * Advance the current custom time by the specified delta.
    */
   public static void advanceCustomTimeMs(long delta) {
-    customTimeMs.addAndGet(delta);
+    customTimeNs.addAndGet(delta * 1000000L);
   }
   
   /**
@@ -213,7 +223,7 @@ public class ScalyrUtil {
    * currentTimeMillis() will return the actual system clock.
    */
   public static void removeCustomTime() {
-    customTimeMs.set(-1);
+    customTimeNs.set(-1);
   }
   
   
@@ -230,10 +240,10 @@ public class ScalyrUtil {
    * Equivalent to System.nanoTime(), but based off the 1/1/1970 epoch like currentTimeMillis().
    */
   public static long nanoTime() {
-    long custom = customTimeMs.get();
+    long custom = customTimeNs.get();
     if (custom == -1)
       return System.nanoTime() + nanoTimeOffset;
     else
-      return custom * 1000000L;
+      return custom;
   }
 }

@@ -31,7 +31,10 @@ public class EventFilter {
     
     /**
      * Event timestamp (nanoseconds since Unix epoch).
+     *
+     * Deprecated -- the value in this field may not be correct.
      */
+    @Deprecated
     public long timestampNs;
     
     /**
