@@ -79,24 +79,24 @@ public class ApacheHttpClient extends AbstractHttpClient {
     connectionManager.setDefaultMaxPerRoute(Knob.getInteger("scalyrClientMaxConnectionsPreRoute", 15));
   }
 
-  @Override public OutputStream getOutputStream() throws IOException {
+  @Override public OutputStream getOutputStream() {
     throw new RuntimeException("Not implemented for ApacheHttpClient (pass request body to our constructor)");
   }
 
-  @Override public int getResponseCode() throws IOException {
+  @Override public int getResponseCode() {
     return response.getStatusLine().getStatusCode();
   }
 
-  @Override public String getResponseContentType() throws IOException {
+  @Override public String getResponseContentType() {
     return responseContentType;
   }
 
-  @Override public String getResponseEncoding() throws IOException {
+  @Override public String getResponseEncoding() {
     return responseEncoding;
   }
 
 
-  @Override public InputStream getInputStream() throws IOException {
+  @Override public InputStream getInputStream() {
     return responseStream;
   }
 

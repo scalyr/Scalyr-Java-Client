@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,10 +19,7 @@ package com.scalyr.api.knobs.util;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import com.scalyr.api.Callback;
 import com.scalyr.api.json.JSONArray;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.knobs.ConfigurationFile;
@@ -57,19 +54,19 @@ Legacy:
  */
 public class Whitelist {
   private final Knob whitelistKnob;
-  
+
   /**
    * Holds the result of parsing the most recent knob value. Null until first use.
    * Synchronize access on the Whitelist instance.
    */
   private Set<String> whitelistSet = null;
-  
+
   /**
    * True if the most recent knob value was a wildcard ("*" or "^*"). Undefined if whitelistSet is
    * null. Synchronize access on the Whitelist instance.
    */
   private boolean wildcard;
-  
+
   /**
    * True if the most recent knob value was a negated value (began with a caret). Undefined if whitelistSet is
    * null. Synchronize access on the Whitelist instance.
@@ -117,48 +114,45 @@ public class Whitelist {
   public synchronized boolean isInWhitelist(Enum<?> enumVal) {
     return isInWhitelist(enumVal.name());
   }
-  
+
   /**
    * Return true if the given string appears in the whitelist.
    */
   public synchronized boolean isInWhitelist(String candidate) {
     prepareValue();
-    
+
     if (wildcard)
       return !negated;
     else
       return !negated == whitelistSet.contains(candidate);
   }
-  
+
   /**
    * Return true if our current value is a non-negated wildcard.
    */
   public synchronized boolean acceptsAll() {
     prepareValue();
-    
+
     return wildcard && !negated;
   }
-  
+
   /**
    * Return true if our current value is a negated wildcard.
    */
   public synchronized boolean acceptsNone() {
     prepareValue();
-    
+
     return wildcard && negated;
   }
 
   private void prepareValue() {
     if (whitelistSet == null) {
-      whitelistSet = new HashSet<String>();
-      whitelistKnob.addUpdateListener(new Callback<Knob>(){
-        @Override public void run(Knob value) {
-          rebuildStringSet();
-        }});
+      whitelistSet = new HashSet<>();
+      whitelistKnob.addUpdateListener(value -> rebuildStringSet());
       rebuildStringSet();
     }
   }
-  
+
   /**
    * Overwrite whitelistSet, wildcard, and negated with the latest values from the Knob.
    */

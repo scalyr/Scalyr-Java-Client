@@ -374,17 +374,8 @@ public class Events {
    */
   @Deprecated
   public static Span start(Severity severity, EventAttributes attributes) {
-    try {
-      EventUploader instance = uploaderInstance.get();
-      if (instance != null)
-        return instance.threadEvents.get().start(severity, attributes);
-      else
-        return new Span(ScalyrUtil.nanoTime(), severity);
-    } catch (Exception ex) {
-      Logging.log(Severity.warning, Logging.tagInternalError, "Internal exception in Logs client", ex);
-
-      return new Span(ScalyrUtil.nanoTime(), severity);
-    }
+    event(severity, attributes);
+    return new Span(ScalyrUtil.nanoTime(), attributes, severity);
   }
 
   /**

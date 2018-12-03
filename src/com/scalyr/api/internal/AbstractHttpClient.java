@@ -21,12 +21,12 @@ public abstract class AbstractHttpClient {
   /**
    * Return the content type of the response body, or empty/null if none.
    */
-  public abstract String getResponseContentType() throws IOException;
+  public abstract String getResponseContentType();
 
   /**
    * Return the Content-Encoding header of the response, or empty/null if none.
    */
-  public abstract String getResponseEncoding() throws IOException;
+  public abstract String getResponseEncoding();
 
   /**
    * Get the stream from which the response body can be read. You should eventually call finishedReadingResponse().

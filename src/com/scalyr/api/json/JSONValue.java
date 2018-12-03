@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -91,15 +91,15 @@ public class JSONValue {
   private static void writeUTF8(String text, OutputStream out) throws IOException {
     out.write(text.getBytes(ScalyrUtil.utf8));
   }
-  
+
   /**
    * Convert an object to JSON text.
    * <p>
    * If this object is a Map or a List, and it's also a JSONAware, JSONAware will be considered firstly.
    * <p>
-   * DO NOT call this method from toJSONString() of a class that implements both JSONAware and Map or List with 
-   * "this" as the parameter, use JSONObject.toJSONString(Map) or JSONArray.toJSONString(List) instead. 
-   * 
+   * DO NOT call this method from toJSONString() of a class that implements both JSONAware and Map or List with
+   * "this" as the parameter, use JSONObject.toJSONString(Map) or JSONArray.toJSONString(List) instead.
+   *
    * @param value
    * @return JSON text, or "null" if value is null or it's an NaN or an INF number.
    */

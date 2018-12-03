@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,28 +31,36 @@ import com.scalyr.api.internal.Logging;
 /**
  * A Gauge is an object which can report a value on demand. Gauges are used to periodically
  * sample a value and record it in the Events log. Sample usage:
- * 
+ *
  * <pre>
  *   Gauge.register(new Gauge(){
  *     {@literal @}Override public Object sample() {
  *       return someComputation();
  *   }}, new EventAttributes("tag", "foo"));
  * </pre>
+ *
+ * There is also syntactic sugar (in com.scalyr.core.Util) for defining gauges using lambdas:
+ *
+ * <pre>
+ *   Util.registerGauge(() -&gt; SSOUtils.areSSOIdPConfigsValid()? 0 : 1, "tag", "foo");
+ *   Util.registerGauge(SomeClass::someComputation, "tag", "foo");
+ * </pre>
+ *
  */
 public abstract class Gauge {
   /**
    * Report the current value for this gauge.
-   * 
-   * NOTE: this method should not block, or it will prevent all Gauges from reporting values. 
+   *
+   * NOTE: this method should not block, or it will prevent all Gauges from reporting values.
    */
   public abstract Object sample();
-  
+
   /**
    * Record the current value for this gauge.
-   * 
+   *
    * Most Gauges will not need to override this method. The default implementation calls sample() and then records the
    * result, adding the specified attributes. A Gauge can override this to record multiple values.
-   * 
+   *
    * @param attributes Attributes under which this gauge was registered.
    */
   public void recordValue(EventAttributes attributes) {
@@ -63,17 +71,17 @@ public abstract class Gauge {
       Events.info(attributes_);
     }
   }
-  
+
   /**
    * Timer used to sample gauges events. Allocated when the first gauge is registered.
    */
   private static Timer sampleTimer = null;
   private static TimerTask sampleTask = null;
-  
+
   /**
    * Holds an entry for each registered gauge.
    */
-  private static Map<Gauge, EventAttributes> registeredGauges = new HashMap<Gauge, EventAttributes>(); 
+  private static Map<Gauge, EventAttributes> registeredGauges = new HashMap<Gauge, EventAttributes>();
 
   /**
    * Run the given action on all registered gauges (and their attributes).  Thread safe, but (like any map iterator)
@@ -84,7 +92,7 @@ public abstract class Gauge {
       registeredGauges.forEach(action);
     }
   }
-  
+
   /**
    * Register a gauge. We will record the gauge's value once every 30 seconds, associating
    * the given attributes.
@@ -93,7 +101,7 @@ public abstract class Gauge {
     boolean firstTime = false;
     synchronized (registeredGauges) {
       registeredGauges.put(gauge, attributes);
-      
+
       // If the timer task hasn't been launched yet, launch it now. Also take this opportunity to
       // register a gauge to report the number of outstanding gauges.
       if (sampleTimer == null) {
@@ -101,7 +109,7 @@ public abstract class Gauge {
         firstTime = true;
       }
     }
-    
+
     if (firstTime) {
       sampleTask = new TimerTask(){
         @Override public void run() {
@@ -109,17 +117,17 @@ public abstract class Gauge {
         }};
       sampleTimer.schedule(sampleTask, TuningConstants.GAUGE_SAMPLE_INTERVAL_MS,
           TuningConstants.GAUGE_SAMPLE_INTERVAL_MS);
-      
+
       register(new Gauge(){@Override public Object sample() {
         synchronized (registeredGauges) {
           return registeredGauges.size();
         }
       }}, StatReporter.attributesWithTag("scalyr.gaugeCount"));
     }
-    
+
     return gauge;
   }
-  
+
   private static void recordGaugeValues() {
     List<Map.Entry<Gauge, EventAttributes>> entries = new ArrayList<Map.Entry<Gauge, EventAttributes>>();
     synchronized (registeredGauges) {
@@ -127,7 +135,7 @@ public abstract class Gauge {
         entries.add(entry);
       }
     }
-    
+
     for (Map.Entry<Gauge, EventAttributes> entry : entries) {
       try {
         entry.getKey().recordValue(entry.getValue());
@@ -137,7 +145,7 @@ public abstract class Gauge {
       }
     }
   }
-  
+
   /**
    * Deregister a gauge. If we were recording the gauge's value, we cease doing so.
    */

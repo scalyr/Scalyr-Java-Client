@@ -37,6 +37,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.*;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Internal class which buffers events, and periodically uploads them to the Scalyr Logs service.
@@ -851,62 +852,24 @@ public class EventUploader {
     }
 
     /**
-     * Add a span-start event to the buffer, and return its timestamp.
-     */
-    @Deprecated
-    Span start(Severity severity, EventAttributes attributes) {
-      ResultAndTimestamp resultAndTimestamp = convertAndAddToBuffer(ASSIGN_MONOTONIC_TIMESTAMP, LogService.SPAN_TYPE_START, severity, attributes, null,
-          memoryLimit * TuningConstants.EVENT_BUFFER_RESERVED_PERCENT / 100, false);
-
-      switch (resultAndTimestamp.result) {
-      case discardedByFilter:
-        filterDiscardSpanNesting++;
-        break;
-
-      case discardedByEventOverflow:
-        bufferLimitDiscardSpanNesting++;
-        break;
-
-      case success:
-        break;
-      }
-
-      if (resultAndTimestamp.result != ConvertAndAddResult.discardedByFilter) {
-        if (filterDiscardSpanNesting > 0) {
-          filterDiscardSpanNesting++;
-        }
-      }
-
-      if (resultAndTimestamp.result != ConvertAndAddResult.discardedByEventOverflow) {
-        if (bufferLimitDiscardSpanNesting > 0) {
-          bufferLimitDiscardSpanNesting++;
-        }
-      }
-
-      spanNesting++;
-
-      return new Span(resultAndTimestamp.eventTimestamp, severity);
-    }
-
-    /**
-     * Add an end-span event to the buffer.
+     * Denormalize the end-span event by adding span's start attributes to the incoming `attributes`,
+     * then add it to the buffer just like a non-span event.
      */
     @Deprecated
     void end(Span span, EventAttributes attributes) {
-      convertAndAddToBuffer(ASSIGN_MONOTONIC_TIMESTAMP, LogService.SPAN_TYPE_END, span.severity, attributes, span.startTime,
-          memoryLimit * TuningConstants.EVENT_BUFFER_END_EVENT_RESERVED_PERCENT / 100, false);
+      EventAttributes mergedAttributes = new EventAttributes();
 
-      if (spanNesting > 0) {
-        spanNesting--;
-      } else {
-        Logging.log(Severity.warning, Logging.tagMismatchedEnd, "Events.end(): no span is currently open in this thread.");
+      if (span.startAttributes != null) {
+        mergedAttributes.addAll(span.startAttributes);
       }
 
-      if (filterDiscardSpanNesting > 0)
-        filterDiscardSpanNesting--;
+      if (attributes != null) {
+        mergedAttributes.addAll(attributes);
+      }
 
-      if (bufferLimitDiscardSpanNesting > 0)
-        bufferLimitDiscardSpanNesting--;
+      mergedAttributes.put("latency", TimeUnit.NANOSECONDS.toMillis(ScalyrUtil.nanoTime() - span.startTime));
+
+      event(span.severity, mergedAttributes, ASSIGN_MONOTONIC_TIMESTAMP, span.startTime);
     }
 
     /**
@@ -922,9 +885,17 @@ public class EventUploader {
      * @para timestampNs Timestamp for this event, or ASSIGN_MONOTONIC_TIMESTAMP.
      */
     void event(Severity severity, EventAttributes attributes, long timestampNs) {
-      convertAndAddToBuffer(timestampNs, LogService.SPAN_TYPE_LEAF, severity, attributes, null,
-          memoryLimit * TuningConstants.EVENT_BUFFER_RESERVED_PERCENT / 100, false);
+      event(severity, attributes, timestampNs, null);
     }
+
+    /**
+     * Add a non-span event to the buffer, with an explicitly specified timestamp and startTs
+     */
+    void event(Severity severity, EventAttributes attributes, long timestampNs, Long startNs) {
+      convertAndAddToBuffer(timestampNs, LogService.SPAN_TYPE_LEAF, severity, attributes, startNs,
+        memoryLimit * TuningConstants.EVENT_BUFFER_RESERVED_PERCENT / 100, false);
+    }
+
 
     /**
      * Run the given event through the EventFilter, convert it to JSON, and add it to our event buffer.

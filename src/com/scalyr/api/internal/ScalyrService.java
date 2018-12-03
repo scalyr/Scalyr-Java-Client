@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -48,18 +48,18 @@ public abstract class ScalyrService {
    * Server URLs, each including a trailing slash. Synchronize access.
    */
   protected String[] serverAddresses;
-  
+
   /**
    * Random number generator used to randomize server choices and retry
    * intervals. Synchronize access.
    */
   protected Random random = new Random();
-  
+
   /**
    * API token we pass in all requests to the server.
    */
   protected final String apiToken;
-  
+
   /**
    * If true, then we set connection="close" on each request. This avoids any possibility of problems with the HTTP
    * client failing to correctly track the connection state.
@@ -71,23 +71,23 @@ public abstract class ScalyrService {
    * if leaving the connection open turns out to contribute to OOM problems.
    */
   public boolean explicitlyDisconnect = false;
-  
+
   /**
    * Construct a ScalyrService.
-   * 
+   *
    * @param apiToken The API authorization token to use when communicating with the server. (If you need
    *     to use multiple api tokens, construct a separate instance for each.)
    */
   public ScalyrService(String apiToken) {
     this.apiToken = apiToken;
-    
+
     setServerAddress(
         "https://api1.scalyr.com," +
         "https://api2.scalyr.com," +
         "https://api3.scalyr.com," +
         "https://api4.scalyr.com");
   }
-  
+
   /**
    * Return the server URL(s) we use, as a comma-delimited list.
    */
@@ -98,10 +98,10 @@ public abstract class ScalyrService {
         sb.append(",");
       sb.append(serverAddresses[i]);
     }
-    
+
     return sb.toString();
   }
-  
+
   /**
    * Specify the URL of the Scalyr server, e.g. https://api.scalyr.com. Trailing slash is optional.
    * <p>
@@ -113,7 +113,7 @@ public abstract class ScalyrService {
    * of the Scalyr service. Otherwise, we automatically default to the production Scalyr service.
    * It is best to call this method at most once, before issuing any requests through this
    * service object.
-   * 
+   *
    * @return this ScalyrService object.
    */
   public synchronized ScalyrService setServerAddress(String value) {
@@ -123,10 +123,10 @@ public abstract class ScalyrService {
       s = s.trim();
       if (!s.endsWith("/"))
         s += "/";
-      
+
       serverAddresses[i] = s;
     }
-    
+
     return this;
   }
 
@@ -139,14 +139,14 @@ public abstract class ScalyrService {
    * deadline (TuningConstants.MAXIMUM_RETRY_PERIOD_MS) expires.
    * <p>
    * This method should not be called directly. Instead, work through method-specific wrappers.
-   * 
+   *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
   public JSONObject invokeApi(String methodName, JSONObject parameters) {
     return invokeApiX(methodName, parameters).response;
   }
-  
+
   /**
    * Invoke methodName on a selected server, sending the specified parameters as the request
    * body. Return the (JSON-format) response, as well as additional data about the request and
@@ -157,14 +157,14 @@ public abstract class ScalyrService {
    * deadline (TuningConstants.MAXIMUM_RETRY_PERIOD_MS) expires.
    * <p>
    * This method should not be called directly. Instead, work through method-specific wrappers.
-   * 
+   *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
   public InvokeApiResult invokeApiX(String methodName, JSONObject parameters) {
     return invokeApiX(methodName, parameters, new RpcOptions());
   }
-  
+
   /**
    * Invoke methodName on a selected server, sending the specified parameters as the request
    * body. Return the (JSON-format) response, as well as additional data about the request and
@@ -175,7 +175,7 @@ public abstract class ScalyrService {
    * deadline (TuningConstants.MAXIMUM_RETRY_PERIOD_MS) expires.
    * <p>
    * This method should not be called directly. Instead, work through method-specific wrappers.
-   * 
+   *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
@@ -185,14 +185,14 @@ public abstract class ScalyrService {
     int N = serverAddresses.length;
     String[] shuffled = new String[N];
     System.arraycopy(serverAddresses, 0, shuffled, 0, N);
-           
+
     for (int i = 0; i < N - 1; i++) {
       int j = i + random.nextInt(N - i);
       String temp = shuffled[i];
       shuffled[i] = shuffled[j];
       shuffled[j] = temp;
     }
-    
+
     // Try the operation on each server in turn.
     long startTimeMs = ScalyrUtil.currentTimeMillis();
     int serverIndex = 0;
@@ -206,9 +206,9 @@ public abstract class ScalyrService {
         // If there are no more servers, or our deadline has expired, then
         // rethrow the exception.
         serverIndex++;
-        
+
         long totalElapsedMs = ScalyrUtil.currentTimeMillis() - startTimeMs;
-        
+
         if (serverIndex >= N) {
           long requestElapsedMs = ScalyrUtil.currentTimeMillis() - requestStartTimeMs;
           Logging.log(Severity.warning, Logging.tagServerError,
@@ -222,13 +222,13 @@ public abstract class ScalyrService {
               + " ms exceeded, so giving up", ex);
           throw ex;
         }
-        
+
         Logging.log(Severity.warning, Logging.tagServerError,
             "invokeApi: " + methodName + " failed on " + serverAddress + "; will retry", ex);
       }
     }
   }
-  
+
   /**
    * Options used when sending a request to a server.
    */
@@ -242,12 +242,12 @@ public abstract class ScalyrService {
      * HTTP connextion timeout (see HttpURLConnection.setConnectTimeout).
      */
     public int connectionTimeoutMs = TuningConstants.HTTP_CONNECT_TIMEOUT_MS;
-    
+
     /**
      * HTTP read timeout (see HttpURLConnection.setReadTimeout).
      */
     public int readTimeoutMs = TuningConstants.MAXIMUM_RETRY_PERIOD_MS;
-    
+
     /**
      * Time span during which API operations may be retried (e.g. in response to a network
      * error). Once this many milliseconds have elapsed from the initial API invocation, we
@@ -264,17 +264,17 @@ public abstract class ScalyrService {
      * Parsed response from the server.
      */
     public JSONObject response;
-    
+
     /**
      * Length of the serialized JSON request, in bytes. May not reflect compression.
      */
     public int requestLength;
-    
+
     /**
      * Length of the serialized JSON response, in bytes. May not reflect compression.
      */
     public int responseLength;
-    
+
     /**
      * The latency of the request in milliseconds.
      */

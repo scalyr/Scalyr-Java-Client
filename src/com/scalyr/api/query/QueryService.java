@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -37,14 +37,14 @@ import java.util.Map;
 public class QueryService extends ScalyrService {
   /**
    * Construct a QueryService.
-   * 
+   *
    * @param apiToken The API authorization token to use when communicating with the server. Should
    *     be a "Read Logs" token.
    */
   public QueryService(String apiToken) {
     super(apiToken);
   }
-  
+
   /**
    * Specifies which direction to page through the matching log events when more events match the
    * query than can be returned in a single response.
@@ -53,10 +53,10 @@ public class QueryService extends ScalyrService {
     head,
     tail
   }
-  
+
   /**
    * Retrieve selected log messages.
-   * 
+   *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
    * @param startTime The beginning of the time range to query, using the same syntax as the query UI. You can
@@ -84,33 +84,33 @@ public class QueryService extends ScalyrService {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "log");
-    
+
     if (filter != null)
       parameters.put("filter", filter);
-    
+
     if (startTime != null)
       parameters.put("startTime", startTime);
-    
+
     if (endTime != null)
       parameters.put("endTime", endTime);
-    
+
     if (maxCount != null)
       parameters.put("maxCount", maxCount);
-    
+
     if (pageMode != null)
       parameters.put("pageMode", pageMode.toString());
-    
+
     if (columns != null)
       parameters.put("columns", columns);
-    
+
     if (continuationToken != null)
       parameters.put("continuationToken", continuationToken);
-    
+
     JSONObject rawApiResponse = invokeApi("api/query", parameters);
     checkResponseStatus(rawApiResponse);
     return unpackLogQueryResult(rawApiResponse);
   }
-  
+
   /**
    * Given the raw server response to a log query, encapsulate the query result in a LogQueryResult.
    * The caller should verify that the query was successful (returned status "success").
@@ -120,18 +120,18 @@ public class QueryService extends ScalyrService {
     Double executionTime = convertToDouble(rawApiResponse.get("executionTime"));
     if (executionTime == null)
       executionTime = 0.0;
-    
+
     String continuationToken = (String) rawApiResponse.get("continuationToken");
-    
+
     // Create a LogQueryResult object.
     LogQueryResult result = new LogQueryResult(executionTime, continuationToken);
-    
+
     // Create a table of session records.
     Map<String, EventAttributes> sessionInfos = new HashMap<String, EventAttributes>();
     for (Map.Entry<String, Object> entry : ((JSONObject)rawApiResponse.get("sessions")).entrySet()) {
       sessionInfos.put(entry.getKey(), unpackEventAttributes((JSONObject) entry.getValue()));
     }
-    
+
     // Populate the matches list.
     for (Object matchObject : (JSONArray)rawApiResponse.get("matches")) {
       JSONObject matchJson = (JSONObject) matchObject;
@@ -141,12 +141,12 @@ public class QueryService extends ScalyrService {
       String sessionId = (String) matchJson.get("session");
       String threadId = (String) matchJson.get("thread");
       EventAttributes eventFields = unpackEventAttributes((JSONObject) matchJson.get("attributes"));
-      
+
       EventAttributes sessionFields = sessionInfos.get(sessionId);
-      
+
       result.matches.add(new LogQueryMatch(timestamp, message, severity, sessionId, sessionFields, threadId, eventFields));
     }
-    
+
     return result;
   }
 
@@ -155,23 +155,23 @@ public class QueryService extends ScalyrService {
    */
   private static EventAttributes unpackEventAttributes(JSONObject json) {
     EventAttributes attributes = new EventAttributes();
-    
+
     for (Map.Entry<String, Object> entry : json.entrySet())
       attributes.put(entry.getKey(), entry.getValue());
-    
+
     return attributes;
   }
-  
+
   /**
    * Retrieve numeric data, e.g. for graphing. You can count the rate of events matching some criterion (e.g. error
    * rate), or retrieve a numeric field (e.g. response size).
-   * 
+   *
    * If you will be be invoking the same query repeatedly, you may want to create a timeseries for the query. This is
    * especially useful if you are using the Scalyr API to feed a home-built dashboard, alerting system, or other
    * automated tool. A timeseries precomputes a numeric query, allowing you to execute queries almost instantaneously,
    * and without exhausting your query execution limit. Use the createTimeseries method to create a timeseries, and
    * timeseriesQuery to execute queries using a timeseries.
-   * 
+   *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
    * @param function Specifies the value to compute from the matching events. You can use any function listed
@@ -186,7 +186,7 @@ public class QueryService extends ScalyrService {
    *     supply a simple timestamp, measured in seconds, milliseconds, or nanoseconds since 1/1/1970.
    * @param buckets The number of numeric values to return. The time range is divided into this many equal slices.
    *   You may specify a value from 1 to 5000.
-   * 
+   *
    * @throws ScalyrException if a low-level error occurs (e.g. network failure)
    * @throws ScalyrServerException if the Scalyr service returns an error
    */
@@ -196,22 +196,22 @@ public class QueryService extends ScalyrService {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "numeric");
-    
+
     if (filter != null)
       parameters.put("filter", filter);
-    
+
     if (function != null)
       parameters.put("function", function);
-    
+
     if (startTime != null)
       parameters.put("startTime", startTime);
-    
+
     if (endTime != null)
       parameters.put("endTime", endTime);
-    
+
     if (buckets != null)
       parameters.put("buckets", buckets);
-    
+
     JSONObject rawApiResponse = invokeApi("api/numericQuery", parameters);
     checkResponseStatus(rawApiResponse);
     return unpackNumericQueryResult(rawApiResponse);
@@ -226,15 +226,15 @@ public class QueryService extends ScalyrService {
     Double executionTime = convertToDouble(rawApiResponse.get("executionTime"));
     if (executionTime == null)
       executionTime = 0.0;
-    
+
     // Create a NumericQueryResult object.
     NumericQueryResult result = new NumericQueryResult(executionTime);
-    
+
     // Populate the values array.
     for (Object value : (JSONArray) rawApiResponse.get("values")) {
       result.values.add(convertToDouble(value));
     }
-    
+
     return result;
   }
 
@@ -243,7 +243,7 @@ public class QueryService extends ScalyrService {
    * site, the most common user-agent strings, or the most common response codes returned. (If a very large number
    * of events match your search criteria, the results will be based on a random subsample of at least 500,000
    * matching events.)
-   * 
+   *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
    * @param field Specifies which event field to retrieve.
@@ -253,7 +253,7 @@ public class QueryService extends ScalyrService {
    *     also supply a simple timestamp, measured in seconds, milliseconds, or nanoseconds since 1/1/1970.
    * @param endTime The end of the time range to query, using the same syntax as the query UI. You can also
    *     supply a simple timestamp, measured in seconds, milliseconds, or nanoseconds since 1/1/1970.
-   * 
+   *
    * @throws ScalyrException if a low-level error occurs (e.g. network failure)
    * @throws ScalyrServerException if the Scalyr service returns an error
    */
@@ -262,26 +262,26 @@ public class QueryService extends ScalyrService {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "facet");
-    
+
     if (filter != null)
       parameters.put("filter", filter);
-    
+
     parameters.put("field", field);
-    
+
     if (maxCount != null)
       parameters.put("maxCount", maxCount);
-    
+
     if (startTime != null)
       parameters.put("startTime", startTime);
-    
+
     if (endTime != null)
       parameters.put("endTime", endTime);
-    
+
     JSONObject rawApiResponse = invokeApi("api/facetQuery", parameters);
     checkResponseStatus(rawApiResponse);
     return unpackFacetQueryResult(rawApiResponse);
   }
-  
+
   /**
    * Given the raw server response to a facet query, encapsulate the query result in a FacetQueryResult.
    * The caller should verify that the query was successful (returned status "success").
@@ -291,29 +291,29 @@ public class QueryService extends ScalyrService {
     Double executionTime = convertToDouble(rawApiResponse.get("executionTime"));
     if (executionTime == null)
       executionTime = 0.0;
-    
+
     Long matchCount = convertToLong(rawApiResponse.get("matchCount"));
     if (matchCount == null)
       matchCount = 0L;
-    
+
     // Create a FacetQueryResult object.
     FacetQueryResult result = new FacetQueryResult(matchCount, executionTime);
-    
+
     // Populate the values array.
     for (Object value : (JSONArray) rawApiResponse.get("values")) {
       result.values.add(new ValueAndCount((JSONObject) value));
     }
-    
+
     return result;
   }
-  
+
   /**
    * Retrieve numeric data from a previously defined timeseries. This method is similar to numericQuery(), but relies on
    * parameters defined by a previous call to createTimeseries, and usually executes in a few milliseconds (plus network
    * latency of course). The timeseriesQuery method also allows you to execute multiple queries in a single request.
-   * 
+   *
    * @param queries The queries to execute.
-   * 
+   *
    * @throws ScalyrException if a low-level error occurs (e.g. network failure)
    * @throws ScalyrServerException if the Scalyr service returns an error
    */
@@ -321,26 +321,26 @@ public class QueryService extends ScalyrService {
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
-    
+
     JSONArray queriesJson = new JSONArray();
     parameters.put("queries", queriesJson);
-    
+
     for (TimeseriesQuerySpec query : queries) {
       JSONObject queryJson = new JSONObject();
       queryJson.put("timeseriesId", query.timeseriesId);
       queryJson.put("startTime", query.startTime);
       queryJson.put("endTime", query.endTime);
       queryJson.put("buckets", query.buckets);
-      
+
       queriesJson.add(queryJson);
     }
-    
+
     JSONObject rawApiResponse = invokeApi("api/timeseriesQuery", parameters);
     checkResponseStatus(rawApiResponse);
-    
+
     return unpackTimeseriesQueryResult(rawApiResponse);
   }
-  
+
   /**
    * Parameters for a single timeseries query.
    */
@@ -349,14 +349,14 @@ public class QueryService extends ScalyrService {
      * ID of the timeseries to query, as returned by a previously call to createTimeseries.
      */
     public String timeseriesId;
-    
+
     /**
      * The time range to query, using the same syntax as the query UI. You can also supply a simple timestamp,
      * measured in seconds, milliseconds, or nanoseconds since 1/1/1970. endTime is optional, defaulting to
      * the current time.
      */
     public String startTime, endTime;
-    
+
     /**
      * The number of numeric values to return. The time range is divided into this many equal slices.
      * You may specify a value from 1 to 5000.
@@ -373,15 +373,15 @@ public class QueryService extends ScalyrService {
     Double executionTime = convertToDouble(rawApiResponse.get("executionTime"));
     if (executionTime == null)
       executionTime = 0.0;
-    
+
     // Create a TimeseriesQueryResult object.
     TimeseriesQueryResult result = new TimeseriesQueryResult(executionTime);
-    
+
     // Populate the values array.
     for (Object value : (JSONArray) rawApiResponse.get("results")) {
       result.values.add(unpackNumericQueryResult((JSONObject) value));
     }
-    
+
     return result;
   }
 
@@ -390,15 +390,15 @@ public class QueryService extends ScalyrService {
    * execute queries almost instantaneously. This is useful for queries that you execute repeatedly. If you
    * are using the Scalyr API to feed a home-built dashboard, alerting system, or other automated tool,
    * timeseries are for you.
-   * 
+   *
    * It may take up to half an hour for a timeseries to be fully created. During that time, you can query
    * the timeseries, but queries may not execute as quickly. Recent data is accelerated before older data.
-   * 
+   *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
    * @param function Specifies the value to compute from the matching events. Has the same meaning as for the
    *     numericQuery method.
-   * 
+   *
    * @throws ScalyrException if a low-level error occurs (e.g. network failure)
    * @throws ScalyrServerException if the Scalyr service returns an error
    */
@@ -407,28 +407,28 @@ public class QueryService extends ScalyrService {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "numeric");
-    
+
     if (filter != null)
       parameters.put("filter", filter);
-    
+
     if (function != null)
       parameters.put("function", function);
-    
+
     JSONObject rawApiResponse = invokeApi("api/createTimeseries", parameters);
     checkResponseStatus(rawApiResponse);
     return unpackCreateTimeseriesResult(rawApiResponse);
   }
-  
+
   /**
    * Given the raw server response to a createTimeseries request, encapsulate the result in a
    * CreateTimeseriesResult. The caller should verify that the request was successful (returned status "success").
    */
   private CreateTimeseriesResult unpackCreateTimeseriesResult(JSONObject rawApiResponse) {
     String timeseriesId = rawApiResponse.get("timeseriesId").toString();
-    
+
     return new CreateTimeseriesResult(timeseriesId);
   }
-  
+
   /**
    * Convert the given value to a Long. If the value is null, return null. If the value cannot be
    * converted to a Long (e.g. it is a non-numeric string), throw an exception.
@@ -447,7 +447,7 @@ public class QueryService extends ScalyrService {
     else
       return Long.parseLong(value.toString());
   }
-  
+
   /**
    * Convert the given value to a Double. If the value is null, return null. If the value cannot be
    * converted to a Double (e.g. it is a non-numeric string), throw an exception.
@@ -466,24 +466,24 @@ public class QueryService extends ScalyrService {
     else
       return Double.parseDouble(value.toString());
   }
-  
+
   /**
    * If rawApiResponse does not have a "status" field with value "success", throw a
-   * ScalyrServerException. 
+   * ScalyrServerException.
    */
   private void checkResponseStatus(JSONObject rawApiResponse) throws ScalyrServerException {
     Object responseStatus = rawApiResponse.get("status");
     if (!"success".equals(responseStatus)) {
       Object responseMessage = rawApiResponse.get("message");
-      
+
       String exceptionMessage = responseStatus.toString();
       if (responseMessage != null)
         exceptionMessage += " (" + responseMessage + ")";
-      
+
       throw new ScalyrServerException(exceptionMessage);
     }
   }
-  
+
   /**
    * Encapsulates the result of executing a log query.
    */
@@ -492,45 +492,45 @@ public class QueryService extends ScalyrService {
      * All log events which matched the query (up to the specified maxCount).
      */
     public final List<LogQueryMatch> matches = new ArrayList<LogQueryMatch>();
-    
+
     /**
      * How much time the server spent processing this query, in milliseconds.
      */
     public final double executionTime;
-    
+
     /**
      * This string may be passed to a subsequent query call, to retrieve additional matches. If there are
      * no additional matches, this may be null. If it is not null, there might or might not be additional
      * matches.
      */
     public final String continuationToken;
-    
+
     LogQueryResult(double executionTime, String continuationToken) {
       this.executionTime = executionTime;
       this.continuationToken = continuationToken;
     }
-    
+
     @Override public String toString() {
       int matchCount = matches.size();
-      
+
       StringBuilder sb = new StringBuilder();
       sb.append("{LogQueryResult: ");
-      sb.append(matchCount + " match" + (matchCount != 1 ? "es" : "") 
+      sb.append(matchCount + " match" + (matchCount != 1 ? "es" : "")
           + ", execution time " + executionTime + " ms");
-      
+
       if (continuationToken != null)
         sb.append(", continuationToken [" + continuationToken + "]");
-      
+
       for (LogQueryMatch match : matches) {
         sb.append("\n  ");
         sb.append(match.toString());
       }
-      
+
       sb.append("\n}");
       return sb.toString();
     }
   }
-  
+
   /**
    * Encapsulates an individual event in the result set of a log query.
    */
@@ -539,36 +539,36 @@ public class QueryService extends ScalyrService {
      * Timestamp when this event occurreed, in nanoseconds from 1/1/1970.
      */
     public final long timestamp;
-    
+
     /**
      * The raw log message for this event. May be null for events which did not originate in a log file.
      */
     public final String message;
-    
+
     public final Severity severity;
-    
+
     /**
      * ID of the session within which this event was uploaded to the Scalyr server.
      */
     public final String sessionId;
-    
+
     /**
      * Fields associated with the session. For logs uploaded by the Scalyr Agent, this will contain the
      * server attributes specified in the agent configuration file.
      */
     public final EventAttributes sessionFields;
-    
+
     /**
      * ID of the thread which generated this event. Only meaningful for clients which associate a thread ID
      * with their events.
      */
     public final String threadId;
-    
+
     /**
      * The fields of this event, including fields extracted by a log parser.
      */
     public final EventAttributes fields;
-    
+
     LogQueryMatch(long timestamp, String message, Severity severity, String sessionId, EventAttributes sessionFields,
         String threadId, EventAttributes fields) {
       this.timestamp = timestamp;
@@ -579,13 +579,13 @@ public class QueryService extends ScalyrService {
       this.threadId = threadId;
       this.fields = fields;
     }
-    
+
     @Override public String toString() {
       return "{timestamp " + timestamp + ": " + severity + " " + message + ", fields " + fields +
           ", thread " + threadId + ", session " + sessionId + " / " + sessionFields + "}";
     }
   }
-  
+
   /**
    * Encapsulates the result of executing a numeric query.
    */
@@ -597,36 +597,36 @@ public class QueryService extends ScalyrService {
      * when the logical value of the query function is undefined.)
      */
     public final List<Double> values = new ArrayList<Double>();
-    
+
     /**
      * How much time the server spent processing this query, in milliseconds.
      */
     public final double executionTime;
-    
+
     NumericQueryResult(double executionTime) {
       this.executionTime = executionTime;
     }
-    
+
     @Override public String toString() {
       int valueCount = values.size();
-      
+
       StringBuilder sb = new StringBuilder();
       sb.append("{NumericQueryResult: ");
-      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "") 
+      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "")
           + ", execution time " + executionTime + " ms, values [");
-      
+
       for (int i = 0; i < values.size(); i++) {
         if (i > 0)
           sb.append(", ");
-        
+
         sb.append(values.get(i));
       }
-      
+
       sb.append("]}");
       return sb.toString();
     }
   }
-  
+
   /**
    * Encapsulates the result of executing a facet query.
    */
@@ -636,66 +636,66 @@ public class QueryService extends ScalyrService {
      * the maxCount parameter of the query. Values are sorted in order of decreasing count.
      */
     public final List<ValueAndCount> values = new ArrayList<ValueAndCount>();
-    
+
     /**
      * The total number of events matching the query.
      */
     public final long matchCount;
-    
+
     /**
      * How much time the server spent processing this query, in milliseconds.
      */
     public final double executionTime;
-    
+
     FacetQueryResult(long matchCount, double executionTime) {
       this.matchCount = matchCount;
       this.executionTime = executionTime;
     }
-    
+
     @Override public String toString() {
       int valueCount = values.size();
-      
+
       StringBuilder sb = new StringBuilder();
       sb.append("{FacetQueryResult: ");
-      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "") 
+      sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "")
           + ", " + matchCount + " matching event" + (matchCount != 1 ? "s" : "")
           + ", execution time " + executionTime + " ms, values [");
-      
+
       for (int i = 0; i < values.size(); i++) {
         if (i > 0)
           sb.append(", ");
-        
+
         sb.append(values.get(i));
       }
-      
+
       sb.append("]}");
       return sb.toString();
     }
   }
-  
+
   /**
    * Bundles a single value in a facet query result, with the number of matching events which had that
    * value.
    */
   public static class ValueAndCount {
     public final Object value;
-    
+
     public final long count;
-    
+
     public ValueAndCount(Object value, long count) {
       this.value = value;
       this.count = count;
     }
-    
+
     public ValueAndCount(JSONObject json) {
       this(json.get("value"), convertToLong(json.get("count")));
     }
-    
+
     @Override public String toString() {
       return "{" + value + ": " + count + "}";
     }
   }
-  
+
   /**
    * Encapsulates the result of executing a timeseries query.
    */
@@ -704,36 +704,36 @@ public class QueryService extends ScalyrService {
      * The requested numeric values, one for each query in the batch.
      */
     public final List<NumericQueryResult> values = new ArrayList<NumericQueryResult>();
-    
+
     /**
      * How much time the server spent processing all queries in the batch, in milliseconds.
      */
     public final double executionTime;
-    
+
     TimeseriesQueryResult(double executionTime) {
       this.executionTime = executionTime;
     }
-    
+
     @Override public String toString() {
       int valueCount = values.size();
-      
+
       StringBuilder sb = new StringBuilder();
       sb.append("{TimeseriesQueryResult: ");
       sb.append(valueCount + " value" + (valueCount != 1 ? "s" : "")
           + ", execution time " + executionTime + " ms, values [");
-      
+
       for (int i = 0; i < values.size(); i++) {
         if (i > 0)
           sb.append(", ");
-        
+
         sb.append(values.get(i));
       }
-      
+
       sb.append("]}");
       return sb.toString();
     }
   }
-  
+
   /**
    * Encapsulates the result of creating a timeseries.
    */
@@ -742,11 +742,11 @@ public class QueryService extends ScalyrService {
      * The ID of the newly created timeseries. Use this value when calling timeseriesQuery.
      */
     public final String timeseriesId;
-    
+
     public CreateTimeseriesResult(String timeseriesId) {
       this.timeseriesId = timeseriesId;
     }
-    
+
     @Override public String toString() {
       return "{CreateTimeseriesResult: timeseriesId=" + timeseriesId + "}";
     }

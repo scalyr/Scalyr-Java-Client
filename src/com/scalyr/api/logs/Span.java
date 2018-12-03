@@ -28,12 +28,18 @@ public class Span {
   final long startTime;
 
   /**
+   * event attributes that will be appended when we end this span.
+   */
+  final EventAttributes startAttributes;
+
+  /**
    * Severity of the start event.
    */
   final Severity severity;
 
-  Span(long startTime, Severity severity) {
+  Span(long startTime, EventAttributes startAttributes, Severity severity) {
     this.startTime = startTime;
+    this.startAttributes = startAttributes;
     this.severity = severity;
   }
 }

@@ -45,11 +45,11 @@ public class JavaNetHttpClient extends AbstractHttpClient {
     return connection.getResponseCode();
   }
 
-  @Override public String getResponseContentType() throws IOException {
+  @Override public String getResponseContentType() {
     return connection.getContentType();
   }
 
-  @Override public String getResponseEncoding() throws IOException {
+  @Override public String getResponseEncoding() {
     return connection.getContentEncoding();
   }
 

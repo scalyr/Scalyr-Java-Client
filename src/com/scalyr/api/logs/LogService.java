@@ -1,13 +1,13 @@
 /*
  * Scalyr client library
  * Copyright 2012 Scalyr, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,33 +30,33 @@ import com.scalyr.api.json.JSONStreamAware;
 public class LogService extends ScalyrService {
   /**
    * Construct a LogService.
-   * 
+   *
    * @param apiToken The API authorization token to use when communicating with the server. (If you need
    *     to use multiple api tokens, construct a separate LogService instance for each.)
    */
   public LogService(String apiToken) {
     super(apiToken);
-    
+
     setServerAddress("https://log.scalyr.com");
   }
 
   @Override public synchronized LogService setServerAddress(String value) {
     return (LogService) super.setServerAddress(value);
   }
-  
+
   /**
    * Upload a batch of events to the Scalyr Logs service. See the
    * <a href="https://www.scalyr.com/help/api">HTTP API documentation</a> for a detailed description
    * of each parameter.
-   * 
+   *
    * @param sessionId ID of this process instance.
    * @param sessionInfo Attributes to associate with this session. Should be remain constant for
    *     all calls to uploadEvents with a given session ID.
    * @param events The events to upload (a JSON array).
    * @param threadInfos Optional; contains information for the threads referenced in the events array.
-   * 
+   *
    * @return The JSON-formatted response from the server. See <a href='https://www.scalyr.com/help/api'>scalyr.com/help/api</a>.
-   * 
+   *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
@@ -64,7 +64,7 @@ public class LogService extends ScalyrService {
       JSONStreamAware events, JSONArray threadInfos)
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
-    
+
     parameters.put("clientVersion", 1);
     parameters.put("token", apiToken);
     parameters.put("session", sessionId);
@@ -73,10 +73,10 @@ public class LogService extends ScalyrService {
     parameters.put("events", events);
     if (threadInfos != null && threadInfos.size() > 0)
       parameters.put("threads", threadInfos);
-    
+
     return invokeApi("addEvents", parameters);
   }
-  
+
   public static final int SPAN_TYPE_LEAF  = 0;
   public static final int SPAN_TYPE_START = 1;
   public static final int SPAN_TYPE_END   = 2;
