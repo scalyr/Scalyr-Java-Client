@@ -1,5 +1,6 @@
 Scalyr Java Client Library
 ---
+[![CircleCI](https://circleci.com/gh/scalyr/Scalyr-Java-Client/tree/master.svg?style=svg)](https://circleci.com/gh/scalyr/Scalyr-Java-Client/tree/master)
 
 This is the source code for the Java client to the Scalyr Logs and Scalyr Knobs services.
 See [scalyr.com/logapijava](https://www.scalyr.com/logapijava) for an introduction to the
