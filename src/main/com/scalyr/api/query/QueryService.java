@@ -334,8 +334,8 @@ public class QueryService extends ScalyrService {
         if (query.function != null) { queryJson.put("function", query.function); }
       }
       queryJson.put("startTime", query.startTime);
-      queryJson.put("endTime"  , query.endTime  );
-      queryJson.put("buckets"  , query.buckets  );
+      queryJson.put("endTime", query.endTime);
+      queryJson.put("buckets", query.buckets);
 
       queriesJson.add(queryJson);
     }
@@ -351,8 +351,7 @@ public class QueryService extends ScalyrService {
    */
   public static class TimeseriesQuerySpec {
     /** This field is deprecated. Use 'filter' and 'function' instead. */
-    @Deprecated
-    public String timeseriesId;
+    @Deprecated public String timeseriesId;
 
     /**
      * The time range to query, using the same syntax as the query UI. You can also supply a simple timestamp,
@@ -403,8 +402,7 @@ public class QueryService extends ScalyrService {
   /**
    * Deprecated. See git history for javadoc.
    */
-  @Deprecated
-  public CreateTimeseriesResult createTimeseries(String filter, String function)
+  @Deprecated public CreateTimeseriesResult createTimeseries(String filter, String function)
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
