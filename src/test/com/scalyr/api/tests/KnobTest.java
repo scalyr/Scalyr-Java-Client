@@ -333,7 +333,6 @@ public class KnobTest extends KnobTestBase {
 
     double delta = 0.001; // acceptable error for stuff like converting from -bytes to -ibibytes
     assertEquals(123,        new Knob.Size("number", -1L, bar).get(), 0              );
-
     assertEquals(23,         new Knob.Size("b", -1L, bar).getB(),     0              );
     assertEquals(.000023,    new Knob.Size("b", -1L, bar).getMB(),    delta*0.000023 );
     assertEquals(45,         new Knob.Size("kb", -1L, bar).getKB(),   0              );
