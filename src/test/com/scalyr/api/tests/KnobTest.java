@@ -82,8 +82,8 @@ public class KnobTest extends KnobTestBase {
     Knob.String valueBar = new Knob.String("bar", "barDefault", paramFile);
     Knob.String valueBaz = new Knob.String("baz", "bazDefault", paramFile);
 
-    assertEquals("abc", valueFoo.get());
-    assertEquals("xyz", valueBar.get());
+    assertEquals("abc",        valueFoo.get());
+    assertEquals("xyz",        valueBar.get());
     assertEquals("bazDefault", valueBaz.get());
 
     assertRequestQueueEmpty();
@@ -134,13 +134,13 @@ public class KnobTest extends KnobTestBase {
       ex.printStackTrace();
     }
 
-    assertEquals("abc2", valueFoo.get());
-    assertEquals("xyz", valueBar.get());
+    assertEquals("abc2",       valueFoo.get());
+    assertEquals("xyz",        valueBar.get());
     assertEquals("bazDefault", valueBaz.get());
 
     assertEquals("abc2", fooListener.value);
-    assertEquals(null, barListener.value);
-    assertEquals(null, bazListener.value);
+    assertEquals(null,   barListener.value);
+    assertEquals(null,   bazListener.value);
     fooListener.value = null;
 
     valueFoo.removeUpdateListener(fooListener);
@@ -158,13 +158,13 @@ public class KnobTest extends KnobTestBase {
       ex.printStackTrace();
     }
 
-    assertEquals("abc3", valueFoo.get());
+    assertEquals("abc3",       valueFoo.get());
     assertEquals("barDefault", valueBar.get());
-    assertEquals("pdq", valueBaz.get());
+    assertEquals("pdq",        valueBaz.get());
 
-    assertEquals(null, fooListener.value);
+    assertEquals(null,         fooListener.value);
     assertEquals("barDefault", barListener.value);
-    assertEquals("pdq", bazListener.value);
+    assertEquals("pdq",        bazListener.value);
     barListener.value = null;
     bazListener.value = null;
 
@@ -185,8 +185,8 @@ public class KnobTest extends KnobTestBase {
     assertEquals("barDefault", valueBar.get());
     assertEquals("bazDefault", valueBaz.get());
 
-    assertEquals(null, fooListener.value);
-    assertEquals(null, barListener.value);
+    assertEquals(null,         fooListener.value);
+    assertEquals(null,         barListener.value);
     assertEquals("bazDefault", bazListener.value);
     bazListener.value = null;
 
@@ -284,8 +284,8 @@ public class KnobTest extends KnobTestBase {
       ex.printStackTrace();
     }
 
-    assertEquals("abc2", valueFoo.get());
-    assertEquals("xyz", valueBar.get());
+    assertEquals("abc2",       valueFoo.get());
+    assertEquals("xyz",        valueBar.get());
     assertEquals("bazDefault", valueBaz.get());
   }
 
@@ -318,25 +318,37 @@ public class KnobTest extends KnobTestBase {
             "'content': '{ invalid1: \\' \\', \\'invalid2\\': \\'12a\\', invalid3: \\'32M\\', invalid4: \\'32iB\\', invalid5: \\'32KBs\\', invalid6: \\'10kb\\'}'}");
     ConfigurationFile foo = factory.getFile("/foo.txt");
 
-    verifyExceptionMessageContains(new Knob.Integer("invalid1", -1, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Integer("invalid2", -1, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Integer("invalid3", -1, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Integer("invalid4", -1, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Integer("invalid5", -1, foo)::get, "Can't convert [");
+    verifyExceptionMessageContains(new Knob.Size("invalid1", -1L, foo)::get, "Can't convert [");
+    verifyExceptionMessageContains(new Knob.Size("invalid2", -1L, foo)::get, "Can't convert [");
+    verifyExceptionMessageContains(new Knob.Size("invalid3", -1L, foo)::get, "Can't convert [");
+    verifyExceptionMessageContains(new Knob.Size("invalid4", -1L, foo)::get, "Can't convert [");
+    verifyExceptionMessageContains(new Knob.Size("invalid5", -1L, foo)::get, "Can't convert [");
 
     expectRequest(
         "getFile",
         "{'token': 'dummyToken', 'path': '/bar.txt'}",
         "{'status': 'success', 'path': '/bar.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
-            "'content': '{ number: \\'  123  \\', b: \\'23 B\\', \\'kb\\': \\'45KB\\', mib: \\'  67MiB\\', gb: \\' 89 GB\\', tb: \\'34 TiB \\'}'}");
+            "'content': '{ number: \\'  123  \\', b: \\'23 B\\', \\'kb\\': \\'45KB\\', mib: \\'  67MiB\\', gb: \\' 89 GB\\', tib: \\'34 TiB \\'}'}");
     ConfigurationFile bar = factory.getFile("/bar.txt");
 
-    assertEquals(123, (long)(new Knob.Long("number", -1L, bar).get()));
-    assertEquals(23, (long)(new Knob.Long("b", -1L, bar).get()));
-    assertEquals(45 * 1000, (long)(new Knob.Long("kb", -1L, bar).get()));
-    assertEquals(67 * 1024 * 1024, (long)(new Knob.Long("mib", -1L, bar).get()));
-    assertEquals(89L * 1000 * 1000 * 1000, (long)(new Knob.Long("gb", -1L, bar).get()));
-    assertEquals(34L * 1024 * 1024 * 1024 * 1024, (long)(new Knob.Long("tb", -1L, bar).get()));
+    double delta = 0.001; // acceptable error for stuff like converting from -bytes to -ibibytes
+    assertEquals(123,        new Knob.Size("number", -1L, bar).get(), 0              );
+
+    assertEquals(23,         new Knob.Size("b", -1L, bar).getB(),     0              );
+    assertEquals(.000023,    new Knob.Size("b", -1L, bar).getMB(),    delta*0.000023 );
+    assertEquals(45,         new Knob.Size("kb", -1L, bar).getKB(),   0              );
+    assertEquals(.045,       new Knob.Size("kb", -1L, bar).getMB(),   0              );
+    assertEquals(67,         new Knob.Size("mib", -1L, bar).getMiB(), 0              );
+    assertEquals(7.025e+7,   new Knob.Size("mib", -1L, bar).get(),    delta*7.025e+7 );
+    assertEquals(70254.6,    new Knob.Size("mib", -1L, bar).getKB(),  delta*70254.6  );
+    assertEquals(89,         new Knob.Size("gb", -1L, bar).getGB(),   0              );
+    assertEquals(.089,       new Knob.Size("gb", -1L, bar).getTB(),   0              );
+    assertEquals(84877,      new Knob.Size("gb", -1L, bar).getMiB(),  delta*84877    );
+    assertEquals(34,         new Knob.Size("tib", -1L, bar).getTiB(), 0              );
+    assertEquals(.033203125, new Knob.Size("tib", -1L, bar).getPiB(), 0              );
+    assertEquals(.0373834,   new Knob.Size("tib", -1L, bar).getPB(),  delta*0.0373834);
+    assertEquals(37.3834,    new Knob.Size("tib", -1L, bar).getTB(),  delta*37.3834  );
+    assertEquals(3.738e10,   new Knob.Size("tib", -1L, bar).getKB(),  delta*3.738e10 );
   }
 
   private void verifyExceptionMessageContains(Supplier supplier, String message) {
@@ -348,10 +360,10 @@ public class KnobTest extends KnobTestBase {
   }
 
   @Test public void testConverterWithoutBytes() {
-    assertEquals(2000000L, (long) Converter.parseNumberWithSI("2M"));
-    assertEquals(-2000000000L, (long) Converter.parseNumberWithSI("-2G"));
-    assertEquals(5000L, (long) Converter.parseNumberWithSI("5K"));
-    assertEquals(-1000000000000000L, (long) Converter.parseNumberWithSI("-1p"));
+    assertEquals(2000000L,            (long) Converter.parseNumberWithSI("2M"));
+    assertEquals(-2000000000L,        (long) Converter.parseNumberWithSI("-2G"));
+    assertEquals(5000L,               (long) Converter.parseNumberWithSI("5K"));
+    assertEquals(-1000000000000000L,  (long) Converter.parseNumberWithSI("-1p"));
   }
 
   /**
@@ -454,26 +466,26 @@ public class KnobTest extends KnobTestBase {
 
     Knob.Duration value2min = new Knob.Duration("time1", 1L, TimeUnit.SECONDS, paramFile);
 
-    assertEquals(120000L, value2min.millis());
-    assertEquals(120L, value2min.seconds());
+    assertEquals(120000L,       value2min.millis());
+    assertEquals(120L,          value2min.seconds());
     assertEquals(120000000000L, value2min.get().toNanos());
 
     //ALL possible tests on 3day knob
 
     Knob.Duration value3days = new Knob.Duration("time3", 3L, TimeUnit.DAYS, paramFile);
 
-    assertEquals(259200000000L, value3days.micros());
-    assertEquals(259200L, value3days.seconds());
-    assertEquals(259200000000000L, value3days.nanos());
-    assertEquals(259200000L, value3days.millis());
-    assertEquals(4320L, value3days.minutes());
-    assertEquals(72L, value3days.hours());
-    assertEquals(3L, value3days.days());
-    assertEquals(259200000000000L, value3days.get().toNanos());
-    assertEquals(259200000L, value3days.get().toMillis());
-    assertEquals(4320L, value3days.get().toMinutes());
-    assertEquals(72L, value3days.get().toHours());
-    assertEquals(3L, value3days.get().toDays());
+    assertEquals(259200000000L,       value3days.micros());
+    assertEquals(259200L,             value3days.seconds());
+    assertEquals(259200000000000L,    value3days.nanos());
+    assertEquals(259200000L,          value3days.millis());
+    assertEquals(4320L,               value3days.minutes());
+    assertEquals(72L,                 value3days.hours());
+    assertEquals(3L,                  value3days.days());
+    assertEquals(259200000000000L,    value3days.get().toNanos());
+    assertEquals(259200000L,          value3days.get().toMillis());
+    assertEquals(4320L,               value3days.get().toMinutes());
+    assertEquals(72L,                 value3days.get().toHours());
+    assertEquals(3L,                  value3days.get().toDays());
 
     //Testing default value on knob with no config
 

@@ -385,9 +385,7 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Long get() {
-      return convertWithSI(super.get());
-    }
+    @Override public java.lang.Long get() { return convertWithSI(super.get()); }
 
     @Override public java.lang.Long getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
@@ -473,10 +471,9 @@ public class Knob {
    * Subclass of Knob for durations, to make writing them nicer (eg. "2 minutes" or "1 DAY").
    *
    * CONFIG FILES:
-   *
-   *  In the config file, define value in the format "[DURATION] [UNIT]", eg. "2 minutes" or "4ns" or "450 millis".
-   *
-   *  Acceptable units:
+   *  - In the config file, define value in the format "[DURATION] [UNIT]", eg. "2 minutes" or "4ns" or "450 millis".
+   *  - CONVENTION: {ns, micros, ms, sec, min, hr, day(s)}
+   *  - All acceptable units:
    *    ns, nano, nanos, nanosecond, nanoseconds
    *    micro, micros, microsecond, microseconds, µ, µs
    *    ms, milli, millis, millisecond, milliseconds
@@ -484,27 +481,22 @@ public class Knob {
    *    m, min, mins, minute, minutes
    *    h, hr, hrs, hour, hours
    *    d, day, days
-   *
-   *   - Durations are case insensitive.
-   *   - Spaces are okay when leading, trailing, or in between the amount and the units.
+   *  - Durations are case insensitive, but convention is lowercase
+   *  - Spaces are okay when leading, trailing, or in between the amount and the units.
    *
    * METHODS TO GET VALUE:
-   *
-   *  We provide long-valued accessors that return commonly used units:
+   *  - We provide long-valued accessors that return commonly used units:
    *    .nanos(), .micros(), .millis(), .seconds(), .minutes(), .hours(), .days()
-   *
-   *  The standard Knob.get() method is also overridden to return a java.time.Duration object,
-   *  which can be used with its native methods such as .toNanos() to get a Long value.
+   *  - The standard Knob.get() method is also overridden to return a java.time.Duration object,
+   *    which can be used with its native methods such as .toNanos() to get a Long value.
    *
    * EXAMPLE USAGE:
-   *
    *  // Assume that config file has {myLabel: "1day"}
    *  Knob.Duration myKnob = new Knob.Duration("myLabel", 1L, TimeUnit.SECONDS, paramFile);
    *  long hoursInADay = myKnob.hours(); //Will be 24 hours
    *
    */
   public static class Duration extends Knob {
-
     public Duration(java.lang.String valueKey, java.lang.Long defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
       // We always store default value in Nanoseconds
       super(valueKey, TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit), files);
@@ -561,6 +553,65 @@ public class Knob {
         return Converter.parseNanos((java.lang.String) value);
       } else {
         throw new IllegalArgumentException("Got non-string, non-integral value: " + value);
+      }
+    }
+  }
+
+  /**
+   * Subclass of Knob which is specialized for sizes, with or without SI.
+   *
+   * CONFIG FILES:
+   *  - In the config file, define value in the format "[MAGNITUDE] [UNIT]", eg. "2 MiB" or "4ns" or "450 KB".
+   *  - Acceptable units: (Case insensitive, but for convention please format as shown.)
+   *    [no unit == B], B, KB, KiB, MB, MiB, GB, GiB, TB, TiB, PB, PiB
+   *
+   * METHODS TO GET VALUE:
+   *  - We provide double-valued accessors as follows:
+   *    .getB(), .getKB(), .getKiB(), .getMB(), .getMiB(), .getGB(), .getGiB(), getTB(), getTiB(), getPB(), getPiB()
+   *  - The standard Knob.get() method will return size in byte amount.
+   *
+   * EXAMPLE USAGE:
+   *  // Assume that config file has {myLabel: "1MiB"}
+   *  Knob.Size myKnob = new Knob.Size("myLabel", 1L, paramFile);
+   *  double valueAsKilobytes = myKnob.getKB();
+   */
+  public static class Size extends Knob {
+    public Size(java.lang.String valueKey, java.lang.Long defaultValue, ConfigurationFile ... files) {
+      super(valueKey, defaultValue, files);
+    }
+
+    @Override public java.lang.Double get() { return convertWithSI(super.get()); }
+
+    @Override public java.lang.Double getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
+      return convertWithSI(super.getWithTimeout(timeoutInMs));
+    }
+
+    @Override public Size expireHint(java.lang.String dateStr) {
+      return this;
+    }
+
+    //-----------------------------------------------------------------------------------------------
+    // New Get Methods. Plain get() will return in bytes.
+    // Returns are doubles (for cases such as calling getKB() on '500B', which will yield a decimal).
+    //-----------------------------------------------------------------------------------------------
+
+    public double getB()   { return this.get();                     } // Byte
+    public double getKB()  { return this.get() / 1000D;             } // Kilobyte
+    public double getKiB() { return this.get() / 1024D;             } // Kibibyte
+    public double getMB()  { return this.get() / 1000000D;          } // Megabyte
+    public double getMiB() { return this.get() / 1048576D;          } // Mebibyte
+    public double getGB()  { return this.get() / 1000000000D;       } // Gigabyte
+    public double getGiB() { return this.get() / 1073741824D;       } // Gibibyte
+    public double getTB()  { return this.get() / 1000000000000D;    } // Terabyte
+    public double getTiB() { return this.get() / 1099511627776D;    } // Tebibyte
+    public double getPB()  { return this.get() / 1000000000000000D; } // Petabyte
+    public double getPiB() { return this.get() / 1125899906842624D; } // Pebibyte
+
+    private java.lang.Double convertWithSI(Object obj) {
+      try {
+        return Converter.toDouble(obj);
+      } catch (RuntimeException ex) {
+        return Converter.parseNumberWithSI(obj).doubleValue();
       }
     }
   }
