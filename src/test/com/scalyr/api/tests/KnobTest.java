@@ -315,14 +315,13 @@ public class KnobTest extends KnobTestBase {
         "getFile",
         "{'token': 'dummyToken', 'path': '/foo.txt'}",
         "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
-            "'content': '{ invalid1: \\' \\', \\'invalid2\\': \\'12a\\', invalid3: \\'32M\\', invalid4: \\'32iB\\', invalid5: \\'32KBs\\', invalid6: \\'10kb\\'}'}");
+            "'content': '{ invalid1: \\' \\', \\'invalid2\\': \\'12a\\', invalid3: \\'32iB\\', invalid4: \\'32KBs\\'}'}");
     ConfigurationFile foo = factory.getFile("/foo.txt");
 
     verifyExceptionMessageContains(new Knob.Size("invalid1", -1L, foo)::get, "Can't convert [");
     verifyExceptionMessageContains(new Knob.Size("invalid2", -1L, foo)::get, "Can't convert [");
     verifyExceptionMessageContains(new Knob.Size("invalid3", -1L, foo)::get, "Can't convert [");
     verifyExceptionMessageContains(new Knob.Size("invalid4", -1L, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Size("invalid5", -1L, foo)::get, "Can't convert [");
 
     expectRequest(
         "getFile",
@@ -353,6 +352,7 @@ public class KnobTest extends KnobTestBase {
   private void verifyExceptionMessageContains(Supplier supplier, String message) {
     try {
       supplier.get();
+      fail("Didn't have exception on invalid config entry.");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains(message));
     }
