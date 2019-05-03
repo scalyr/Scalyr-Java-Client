@@ -113,9 +113,7 @@ public class Knob {
    * Specify a default list of configuration files. This will be used for any Knob in which no file list was specified.
    * Existing Knobs are not affected by changes to the default file list.
    */
-  public static void setDefaultFiles(ConfigurationFile[] files) {
-    defaultFiles.set(files);
-  }
+  public static void setDefaultFiles(ConfigurationFile[] files) { defaultFiles.set(files); }
 
   /**
    * @param key The key to look for (a fieldname of the top-level JSON object in the file), or null to always use defaultValue.
@@ -201,9 +199,7 @@ public class Knob {
    * If the file does not exist or does not contain the key (or the key is null), return our default value.
    * If the file has not yet been retrieved from the server, we block until it can be retrieved.
    */
-  public Object get() {
-    return getWithTimeout(null);
-  }
+  public Object get() { return getWithTimeout(null); }
 
   /**
    * Like get(), but if the file has not yet been retrieved from the server, and the specified time
@@ -298,7 +294,6 @@ public class Knob {
       ensureFileListener();
     }
     updateListeners.add(updateListener);
-
     return this;
   }
 
@@ -322,7 +317,6 @@ public class Knob {
     for (ConfigurationFile file : files)
       if (!file.hasState())
         return false;
-
     return true;
   }
 
@@ -346,9 +340,7 @@ public class Knob {
    * @param dateStr after which we may want to pull this knob.  Not currently parsed.
    * @return self for chaining
    */
-  public Knob expireHint(java.lang.String dateStr) {
-    return this;
-  }
+  public Knob expireHint(java.lang.String dateStr) { return this; }
 
   /**
    * Subclass of Knob which is specialized for Integer values, with or without SI.
@@ -364,9 +356,7 @@ public class Knob {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Integer expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Integer expireHint(java.lang.String dateStr) { return this; }
 
     protected java.lang.Integer convertWithSI(Object obj) {
       try {
@@ -391,9 +381,7 @@ public class Knob {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Long expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Long expireHint(java.lang.String dateStr) { return this; }
 
     private java.lang.Long convertWithSI(Object obj) {
       try {
@@ -412,17 +400,13 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Double get() {
-      return Converter.toDouble(super.get());
-    }
+    @Override public java.lang.Double get() { return Converter.toDouble(super.get()); }
 
     @Override public java.lang.Double getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toDouble(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Double expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Double expireHint(java.lang.String dateStr) { return this; }
   }
 
   /**
@@ -433,17 +417,13 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Boolean get() {
-      return Converter.toBoolean(super.get());
-    }
+    @Override public java.lang.Boolean get() { return Converter.toBoolean(super.get()); }
 
     @Override public java.lang.Boolean getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toBoolean(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Boolean expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Boolean expireHint(java.lang.String dateStr) { return this; }
   }
 
   /**
@@ -454,17 +434,13 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.String get() {
-      return Converter.toString(super.get());
-    }
+    @Override public java.lang.String get() { return Converter.toString(super.get()); }
 
     @Override public java.lang.String getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toString(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public String expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public String expireHint(java.lang.String dateStr) { return this; }
   }
 
   /**
@@ -507,9 +483,7 @@ public class Knob {
     //--------------------------------------------------------------------------------
 
     // Since with get() we can't specify a unit for time, we return a java.time.Duration
-    @Override public java.time.Duration get() {
-      return this.getWithTimeout(null, false);
-    }
+    @Override public java.time.Duration get() { return this.getWithTimeout(null, false); }
 
     @Override public java.time.Duration getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return this.getWithTimeout(timeoutInMs, false);
@@ -519,9 +493,7 @@ public class Knob {
       return java.time.Duration.of(getTimeInNanos(timeoutInMs, bypassCache), ChronoUnit.NANOS);
     }
 
-    @Override public Duration expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Duration expireHint(java.lang.String dateStr) { return this; }
 
     //--------------------------------------------------------------------------------
     // New Methods
@@ -586,9 +558,7 @@ public class Knob {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Size expireHint(java.lang.String dateStr) {
-      return this;
-    }
+    @Override public Size expireHint(java.lang.String dateStr) { return this; }
 
     //-----------------------------------------------------------------------------------------------
     // New Get Methods. Plain get() will return in bytes.
