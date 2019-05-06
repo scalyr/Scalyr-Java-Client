@@ -32,9 +32,13 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.HashSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import java.util.HashMap;
@@ -318,10 +322,11 @@ public class KnobTest extends KnobTestBase {
             "'content': '{ invalid1: \\' \\', \\'invalid2\\': \\'12a\\', invalid3: \\'32iB\\', invalid4: \\'32KBs\\'}'}");
     ConfigurationFile foo = factory.getFile("/foo.txt");
 
-    verifyExceptionMessageContains(new Knob.Size("invalid1", -1L, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Size("invalid2", -1L, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Size("invalid3", -1L, foo)::get, "Can't convert [");
-    verifyExceptionMessageContains(new Knob.Size("invalid4", -1L, foo)::get, "Can't convert [");
+    fails(new Knob.Size("invalid1", -1L, foo)::get, RuntimeException.class);
+    fails(new Knob.Size("invalid2", -1L, foo)::get, RuntimeException.class);
+    fails(new Knob.Size("invalid3", -1L, foo)::get, RuntimeException.class);
+    fails(new Knob.Size("invalid4", -1L, foo)::get, RuntimeException.class);
+    fails(new Knob.Size("invalid1", -1L, foo)::get, RuntimeException.class);
 
     expectRequest(
         "getFile",
@@ -331,31 +336,50 @@ public class KnobTest extends KnobTestBase {
     ConfigurationFile bar = factory.getFile("/bar.txt");
 
     double delta = 0.001; // acceptable error for stuff like converting from -bytes to -ibibytes
-    assertEquals(123,        new Knob.Size("number", -1L, bar).get(), 0              );
-    assertEquals(23,         new Knob.Size("b", -1L, bar).getB(),     0              );
-    assertEquals(.000023,    new Knob.Size("b", -1L, bar).getMB(),    delta*0.000023 );
-    assertEquals(45,         new Knob.Size("kb", -1L, bar).getKB(),   0              );
-    assertEquals(.045,       new Knob.Size("kb", -1L, bar).getMB(),   0              );
-    assertEquals(67,         new Knob.Size("mib", -1L, bar).getMiB(), 0              );
-    assertEquals(7.025e+7,   new Knob.Size("mib", -1L, bar).get(),    delta*7.025e+7 );
-    assertEquals(70254.6,    new Knob.Size("mib", -1L, bar).getKB(),  delta*70254.6  );
-    assertEquals(89,         new Knob.Size("gb", -1L, bar).getGB(),   0              );
-    assertEquals(.089,       new Knob.Size("gb", -1L, bar).getTB(),   0              );
-    assertEquals(84877,      new Knob.Size("gb", -1L, bar).getMiB(),  delta*84877    );
-    assertEquals(34,         new Knob.Size("tib", -1L, bar).getTiB(), 0              );
-    assertEquals(.033203125, new Knob.Size("tib", -1L, bar).getPiB(), 0              );
-    assertEquals(.0373834,   new Knob.Size("tib", -1L, bar).getPB(),  delta*0.0373834);
-    assertEquals(37.3834,    new Knob.Size("tib", -1L, bar).getTB(),  delta*37.3834  );
-    assertEquals(3.738e10,   new Knob.Size("tib", -1L, bar).getKB(),  delta*3.738e10 );
+    checkRelativeEquals(123,        new Knob.Size("number", -1L, bar).get(), 0    );
+    checkRelativeEquals(23,         new Knob.Size("b", -1L, bar).getB(),     0    );
+    checkRelativeEquals(.000023,    new Knob.Size("b", -1L, bar).getMB(),    0    );
+    checkRelativeEquals(45,         new Knob.Size("kb", -1L, bar).getKB(),   0    );
+    checkRelativeEquals(.045,       new Knob.Size("kb", -1L, bar).getMB(),   0    );
+    checkRelativeEquals(67,         new Knob.Size("mib", -1L, bar).getMiB(), 0    );
+    checkRelativeEquals(7.025e+7,   new Knob.Size("mib", -1L, bar).get(),    delta);
+    checkRelativeEquals(70254.6,    new Knob.Size("mib", -1L, bar).getKB(),  delta);
+    checkRelativeEquals(89,         new Knob.Size("gb", -1L, bar).getGB(),   0    );
+    checkRelativeEquals(.089,       new Knob.Size("gb", -1L, bar).getTB(),   0    );
+    checkRelativeEquals(84877,      new Knob.Size("gb", -1L, bar).getMiB(),  delta);
+    checkRelativeEquals(34,         new Knob.Size("tib", -1L, bar).getTiB(), 0    );
+    checkRelativeEquals(.033203125, new Knob.Size("tib", -1L, bar).getPiB(), 0    );
+    checkRelativeEquals(.0373834,   new Knob.Size("tib", -1L, bar).getPB(),  delta);
+    checkRelativeEquals(37.3834,    new Knob.Size("tib", -1L, bar).getTB(),  delta);
+    checkRelativeEquals(3.738e10,   new Knob.Size("tib", -1L, bar).getKB(),  delta);
   }
 
-  private void verifyExceptionMessageContains(Supplier supplier, String message) {
+  // Checks that actual is within delta*expected range of expected
+  private void checkRelativeEquals(double expected, double actual, double delta) {
+    assertEquals(expected, actual, delta*expected);
+  }
+
+  /**
+   * fails() simplified/ported from from Scalyr main repo's TestUtils.
+   */
+  public static void fails(Callable<?> c, Class<? extends Throwable> expectedType) {
+    Predicate<Throwable> test = expectedType::isInstance;
+    boolean succeeded = false;
     try {
-      supplier.get();
-      fail("Didn't have exception on invalid config entry.");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains(message));
+      c.call();
+      succeeded = true;
+    } catch (Throwable t) {
+      assertTrue("call threw exception (good!), but exception failed check (bad!); (unexpected) exception is: "
+                  + getStackTrace(t) + "! ", test == null || test.test(t));
     }
+    if (succeeded) fail("call should have thrown exception, but did not! ");
+  }
+
+  /** Extract the exception's full stack trace as a string. */
+  public static String getStackTrace(Throwable ex) {
+    StringWriter sw = new StringWriter();
+    ex.printStackTrace(new PrintWriter(sw));
+    return sw.getBuffer().toString();
   }
 
   @Test public void testConverterWithoutBytes() {
@@ -495,13 +519,13 @@ public class KnobTest extends KnobTestBase {
     //Exception testing
 
     Knob.Duration invalidKnob1 = new Knob.Duration("invalidTime1", 3L, TimeUnit.DAYS, paramFile);
-    verifyExceptionMessageContains(invalidKnob1::hours, "Invalid duration format: ");
+    fails(invalidKnob1::hours, RuntimeException.class);
 
     Knob.Duration invalidKnob2 = new Knob.Duration("invalidTime2", 3L, TimeUnit.DAYS, paramFile);
-    verifyExceptionMessageContains(invalidKnob2::get, "Invalid duration format: ");
+    fails(invalidKnob2::get, RuntimeException.class);
 
     Knob.Duration invalidKnob3 = new Knob.Duration("invalidTime3", 3L, TimeUnit.DAYS, paramFile);
-    verifyExceptionMessageContains(invalidKnob3::hours, "Invalid duration format: ");
+    fails(invalidKnob3::hours, RuntimeException.class);
   }
 
   @Test public void testGetLongGetIntWithSI() {

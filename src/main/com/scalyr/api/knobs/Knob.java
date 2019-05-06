@@ -113,7 +113,9 @@ public class Knob {
    * Specify a default list of configuration files. This will be used for any Knob in which no file list was specified.
    * Existing Knobs are not affected by changes to the default file list.
    */
-  public static void setDefaultFiles(ConfigurationFile[] files) { defaultFiles.set(files); }
+  public static void setDefaultFiles(ConfigurationFile[] files) {
+    defaultFiles.set(files);
+  }
 
   /**
    * @param key The key to look for (a fieldname of the top-level JSON object in the file), or null to always use defaultValue.
@@ -199,7 +201,9 @@ public class Knob {
    * If the file does not exist or does not contain the key (or the key is null), return our default value.
    * If the file has not yet been retrieved from the server, we block until it can be retrieved.
    */
-  public Object get() { return getWithTimeout(null); }
+  public Object get() {
+    return getWithTimeout(null);
+  }
 
   /**
    * Like get(), but if the file has not yet been retrieved from the server, and the specified time
@@ -293,6 +297,7 @@ public class Knob {
     if (updateListeners.size() == 0) {
       ensureFileListener();
     }
+
     updateListeners.add(updateListener);
     return this;
   }
@@ -317,6 +322,7 @@ public class Knob {
     for (ConfigurationFile file : files)
       if (!file.hasState())
         return false;
+
     return true;
   }
 
@@ -340,7 +346,9 @@ public class Knob {
    * @param dateStr after which we may want to pull this knob.  Not currently parsed.
    * @return self for chaining
    */
-  public Knob expireHint(java.lang.String dateStr) { return this; }
+  public Knob expireHint(java.lang.String dateStr) {
+    return this;
+  }
 
   /**
    * Subclass of Knob which is specialized for Integer values, with or without SI.
@@ -350,13 +358,17 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Integer get() { return convertWithSI(super.get()); }
+    @Override public java.lang.Integer get() {
+      return convertWithSI(super.get());
+    }
 
     @Override public java.lang.Integer getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Integer expireHint(java.lang.String dateStr) { return this; }
+    @Override public Integer expireHint(java.lang.String dateStr) {
+      return this;
+    }
 
     protected java.lang.Integer convertWithSI(Object obj) {
       try {
@@ -375,13 +387,17 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Long get() { return convertWithSI(super.get()); }
+    @Override public java.lang.Long get() {
+      return convertWithSI(super.get());
+    }
 
     @Override public java.lang.Long getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Long expireHint(java.lang.String dateStr) { return this; }
+    @Override public Long expireHint(java.lang.String dateStr) {
+      return this;
+    }
 
     private java.lang.Long convertWithSI(Object obj) {
       try {
@@ -400,13 +416,17 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Double get() { return Converter.toDouble(super.get()); }
+    @Override public java.lang.Double get() {
+      return Converter.toDouble(super.get());
+    }
 
     @Override public java.lang.Double getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toDouble(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Double expireHint(java.lang.String dateStr) { return this; }
+    @Override public Double expireHint(java.lang.String dateStr) {
+      return this;
+    }
   }
 
   /**
@@ -417,13 +437,17 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Boolean get() { return Converter.toBoolean(super.get()); }
+    @Override public java.lang.Boolean get() {
+      return Converter.toBoolean(super.get());
+    }
 
     @Override public java.lang.Boolean getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toBoolean(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Boolean expireHint(java.lang.String dateStr) { return this; }
+    @Override public Boolean expireHint(java.lang.String dateStr) {
+      return this;
+    }
   }
 
   /**
@@ -434,19 +458,24 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.String get() { return Converter.toString(super.get()); }
+    @Override public java.lang.String get() {
+      return Converter.toString(super.get());
+    }
 
     @Override public java.lang.String getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return Converter.toString(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public String expireHint(java.lang.String dateStr) { return this; }
+    @Override public String expireHint(java.lang.String dateStr) {
+      return this;
+    }
   }
 
   /**
    * Subclass of Knob for durations, to make writing them nicer (eg. "2 minutes" or "1 DAY").
    *
    * CONFIG FILES:
+   *
    *  - In the config file, define value in the format "[DURATION] [UNIT]", eg. "2 minutes" or "4ns" or "450 millis".
    *  - CONVENTION: {ns, micros, ms, sec, min, hr, day(s)}
    *  - All acceptable units:
@@ -457,22 +486,25 @@ public class Knob {
    *    m, min, mins, minute, minutes
    *    h, hr, hrs, hour, hours
    *    d, day, days
-   *  - Durations are case insensitive, but convention is lowercase
+   *  - Durations are case insensitive, but convention is lowercase, to help disambiguate vs SI units on Integer/Long/Size.
    *  - Spaces are okay when leading, trailing, or in between the amount and the units.
    *
    * METHODS TO GET VALUE:
+   *
    *  - We provide long-valued accessors that return commonly used units:
    *    .nanos(), .micros(), .millis(), .seconds(), .minutes(), .hours(), .days()
    *  - The standard Knob.get() method is also overridden to return a java.time.Duration object,
    *    which can be used with its native methods such as .toNanos() to get a Long value.
    *
    * EXAMPLE USAGE:
+   *
    *  // Assume that config file has {myLabel: "1day"}
    *  Knob.Duration myKnob = new Knob.Duration("myLabel", 1L, TimeUnit.SECONDS, paramFile);
    *  long hoursInADay = myKnob.hours(); //Will be 24 hours
    *
    */
   public static class Duration extends Knob {
+
     public Duration(java.lang.String valueKey, java.lang.Long defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
       // We always store default value in Nanoseconds
       super(valueKey, TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit), files);
@@ -483,7 +515,9 @@ public class Knob {
     //--------------------------------------------------------------------------------
 
     // Since with get() we can't specify a unit for time, we return a java.time.Duration
-    @Override public java.time.Duration get() { return this.getWithTimeout(null, false); }
+    @Override public java.time.Duration get() {
+      return this.getWithTimeout(null, false);
+    }
 
     @Override public java.time.Duration getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return this.getWithTimeout(timeoutInMs, false);
@@ -493,7 +527,9 @@ public class Knob {
       return java.time.Duration.of(getTimeInNanos(timeoutInMs, bypassCache), ChronoUnit.NANOS);
     }
 
-    @Override public Duration expireHint(java.lang.String dateStr) { return this; }
+    @Override public Duration expireHint(java.lang.String dateStr) {
+      return this;
+    }
 
     //--------------------------------------------------------------------------------
     // New Methods
@@ -530,19 +566,23 @@ public class Knob {
   }
 
   /**
-   * Subclass of Knob which is specialized for sizes, with or without SI.
+   * Subclass of Knob which is specialized for byte-denominated sizes (RAM, disk, etc), with or without SI.
    *
    * CONFIG FILES:
+   *
    *  - In the config file, define value in the format "[MAGNITUDE] [UNIT]", eg. "2 MiB" or "4ns" or "450 KB".
    *  - Acceptable units: (Case insensitive, but for convention please format as shown.)
    *    [no unit == B], B, KB, KiB, MB, MiB, GB, GiB, TB, TiB, PB, PiB
+   *  - Config values must be whole numbers (no decimals)
    *
    * METHODS TO GET VALUE:
+   *
    *  - We provide double-valued accessors as follows:
    *    .getB(), .getKB(), .getKiB(), .getMB(), .getMiB(), .getGB(), .getGiB(), getTB(), getTiB(), getPB(), getPiB()
    *  - The standard Knob.get() method will return size in byte amount.
    *
    * EXAMPLE USAGE:
+   *
    *  // Assume that config file has {myLabel: "1MiB"}
    *  Knob.Size myKnob = new Knob.Size("myLabel", 1L, paramFile);
    *  double valueAsKilobytes = myKnob.getKB();
@@ -552,36 +592,40 @@ public class Knob {
       super(valueKey, defaultValue, files);
     }
 
-    @Override public java.lang.Double get() { return convertWithSI(super.get()); }
+    @Override public java.lang.Long get() {
+      return convertWithSI(super.get());
+    }
 
-    @Override public java.lang.Double getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
+    @Override public java.lang.Long getWithTimeout(java.lang.Long timeoutInMs) throws ScalyrDeadlineException {
       return convertWithSI(super.getWithTimeout(timeoutInMs));
     }
 
-    @Override public Size expireHint(java.lang.String dateStr) { return this; }
+    @Override public Size expireHint(java.lang.String dateStr) {
+      return this;
+    }
 
     //-----------------------------------------------------------------------------------------------
     // New Get Methods. Plain get() will return in bytes.
     // Returns are doubles (for cases such as calling getKB() on '500B', which will yield a decimal).
     //-----------------------------------------------------------------------------------------------
 
-    public double getB()   { return this.get();                     } // Byte
-    public double getKB()  { return this.get() / 1000D;             } // Kilobyte
-    public double getKiB() { return this.get() / 1024D;             } // Kibibyte
-    public double getMB()  { return this.get() / 1000000D;          } // Megabyte
-    public double getMiB() { return this.get() / 1048576D;          } // Mebibyte
-    public double getGB()  { return this.get() / 1000000000D;       } // Gigabyte
-    public double getGiB() { return this.get() / 1073741824D;       } // Gibibyte
-    public double getTB()  { return this.get() / 1000000000000D;    } // Terabyte
-    public double getTiB() { return this.get() / 1099511627776D;    } // Tebibyte
-    public double getPB()  { return this.get() / 1000000000000000D; } // Petabyte
-    public double getPiB() { return this.get() / 1125899906842624D; } // Pebibyte
+    public double getB()   { return this.get().doubleValue();        } // Byte
+    public double getKB()  { return this.getB() / 1000D;             } // Kilobyte
+    public double getKiB() { return this.getB() / 1024D;             } // Kibibyte
+    public double getMB()  { return this.getB() / Math.pow(10, 6);   } // Megabyte
+    public double getMiB() { return this.getB() / Math.pow(2, 20);   } // Mebibyte
+    public double getGB()  { return this.getB() / Math.pow(10, 9);   } // Gigabyte
+    public double getGiB() { return this.getB() / Math.pow(2, 30);   } // Gibibyte
+    public double getTB()  { return this.getB() / Math.pow(10, 12);  } // Terabyte
+    public double getTiB() { return this.getB() / Math.pow(2, 40);   } // Tebibyte
+    public double getPB()  { return this.getB() / Math.pow(10, 15);  } // Petabyte
+    public double getPiB() { return this.getB() / Math.pow(2, 50);   } // Pebibyte
 
-    private java.lang.Double convertWithSI(Object obj) {
+    private java.lang.Long convertWithSI(Object obj) {
       try {
-        return Converter.toDouble(obj);
+        return Converter.toLong(obj);
       } catch (RuntimeException ex) {
-        return Converter.parseNumberWithSI(obj).doubleValue();
+        return Converter.parseNumberWithSI(obj);
       }
     }
   }
