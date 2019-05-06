@@ -579,7 +579,7 @@ public class Knob {
    *
    *  - We provide double-valued accessors as follows:
    *    .getB(), .getKB(), .getKiB(), .getMB(), .getMiB(), .getGB(), .getGiB(), getTB(), getTiB(), getPB(), getPiB()
-   *  - The standard Knob.get() method will return size in byte amount.
+   *  - The standard Knob.get() method will return the size in bytes, as a long.
    *
    * EXAMPLE USAGE:
    *
