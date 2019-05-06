@@ -297,8 +297,8 @@ public class Knob {
     if (updateListeners.size() == 0) {
       ensureFileListener();
     }
-
     updateListeners.add(updateListener);
+
     return this;
   }
 

@@ -326,7 +326,6 @@ public class KnobTest extends KnobTestBase {
     fails(new Knob.Size("invalid2", -1L, foo)::get, RuntimeException.class);
     fails(new Knob.Size("invalid3", -1L, foo)::get, RuntimeException.class);
     fails(new Knob.Size("invalid4", -1L, foo)::get, RuntimeException.class);
-    fails(new Knob.Size("invalid1", -1L, foo)::get, RuntimeException.class);
 
     expectRequest(
         "getFile",
