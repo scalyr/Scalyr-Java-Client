@@ -90,7 +90,7 @@ public class Knob {
   /**
    * Lambda call to Converter for Knobs, called to parse a new value in config file. Can be null.
    */
-  protected @Nullable Function<Object, Object> converter;
+  protected Function<Object, Object> converter;
 
   /**
    * The number of times we've had to fetch our value from the configuration file. Used to decide when to
