@@ -24,7 +24,6 @@ import com.scalyr.api.internal.Logging;
 import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.logs.Severity;
-import com.sun.istack.internal.Nullable;
 
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
