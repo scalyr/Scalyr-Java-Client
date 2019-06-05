@@ -566,16 +566,7 @@ public class EventUploader {
           minUploadIntervalMs *= TuningConstants.UPLOAD_SPACING_FACTOR_ON_SUCCESS;
           minUploadIntervalMs = Math.max(minUploadIntervalMs, TuningConstants.MIN_EVENT_UPLOAD_SPACING_MS);
 
-          synchronized (uploadSynchronizer) {
-            synchronized (chunkSizes) {
-              ScalyrUtil.Assert(chunkSizes.getFirst() == bufferedBytes,
-                  "event buffer chunk was resized while being uploaded");
-              chunkSizes.removeFirst();
-            }
-
-            pendingEventBuffer.discardOldestBytes(bufferedBytes);
-            pendingEventsReachedLimit = false;
-          }
+          discardOldestPendingEvents(bufferedBytes);
         } else {
           logUploadFailure("Server response had bad status [" + rawStatus + "]; complete text: " + parsedResponse.toString());
 
@@ -585,8 +576,15 @@ public class EventUploader {
 
           // Note that we back off for all errors, not just error/server/backoff. Other errors are liable to
           // be systemic, and there's little reason to retry an upload frequently in the face of systemic errors.
-          minUploadIntervalMs *= TuningConstants.UPLOAD_SPACING_FACTOR_ON_BACKOFF;
-          minUploadIntervalMs = Math.min(minUploadIntervalMs, TuningConstants.MAX_EVENT_UPLOAD_SPACING_MS);
+          //
+          // There is one exception, though. If server replied with `accountDisabled` error, we will log the error,
+          // discard those events and not backing off.
+          if (!status.startsWith("error/client/noPermission/accountDisabled")) {
+            minUploadIntervalMs *= TuningConstants.UPLOAD_SPACING_FACTOR_ON_BACKOFF;
+            minUploadIntervalMs = Math.min(minUploadIntervalMs, TuningConstants.MAX_EVENT_UPLOAD_SPACING_MS);
+          } else {
+            discardOldestPendingEvents(bufferedBytes);
+          }
         }
       } catch (JsonParseException ex) {
         logUploadFailure(ex.toString());
@@ -610,6 +608,19 @@ public class EventUploader {
             "success", success));
       Logging.log(Severity.fine, Logging.tagEventUploadOutcome,
           "{\"size\": " + bufferedBytes + ", \"duration\": " + duration + ", \"success\", " + success + "}");
+    }
+  }
+
+  private void discardOldestPendingEvents(int bufferedBytes) {
+    synchronized (uploadSynchronizer) {
+      synchronized (chunkSizes) {
+        ScalyrUtil.Assert(chunkSizes.getFirst() == bufferedBytes,
+            "event buffer chunk was resized while being uploaded");
+        chunkSizes.removeFirst();
+      }
+
+      pendingEventBuffer.discardOldestBytes(bufferedBytes);
+      pendingEventsReachedLimit = false;
     }
   }
 
