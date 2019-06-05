@@ -3,7 +3,7 @@ Scalyr Java Client Library
 [![CircleCI](https://circleci.com/gh/scalyr/Scalyr-Java-Client/tree/master.svg?style=svg)](https://circleci.com/gh/scalyr/Scalyr-Java-Client/tree/master)
 
 This is the source code for the Java client to the Scalyr Logs services.
-See [scalyr.com/logapijava](https://www.scalyr.com/logapijava) for an introduction to the
+See [scalyr.com/logapijava](https://www.scalyr.com/help/java-api) for an introduction to the
 API.
 
 We do not actively solicit outside contributions to the client library, but if you'd
