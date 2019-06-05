@@ -198,6 +198,80 @@ public class KnobTest extends KnobTestBase {
   }
 
   /**
+   * Test that Converter.java calls are only made for SI Knobs when files are updated, not on every get().
+   */
+
+  public static int converterAccessCount;
+  @Test public void testConverterCalls() {
+    converterAccessCount = 0;
+    // Initial file
+    expectRequest(
+        "getFile",
+        "{'token': 'dummyToken', 'path': '/foo.txt'}",
+        "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
+            "'content': '{\\'foo\\': \\'100K\\'}'}");
+
+    ConfigurationFile paramFile = factory.getFile("/foo.txt");
+    Knob fooKnob = new TestLongKnob("foo", 404L, paramFile);
+
+    // Dummy calls
+    assertEquals(100000L, (long) fooKnob.get());
+    for (int i = 0; i < 200; i++) {
+      fooKnob.get();
+    }
+
+    // Update the file
+    expectRequest(
+        "getFile",
+        "{'token': 'dummyToken', 'path': '/foo.txt', 'expectedVersion': 1}",
+        "{'status': 'success', 'path': '/foo.txt', 'version': 2, 'createDate': 1000, 'modDate': 3000," +
+            "'content': '{\\'foo\\': \\'200K\\'}'}");
+    try {
+      Thread.sleep(1000); // must sleep for longer than HostedParameterFile's minimum inter-request delay
+    } catch (InterruptedException ex) {
+      ex.printStackTrace();
+    }
+
+    // Dummy calls
+    assertEquals(200000L, (long) fooKnob.get());
+    for (int i = 0; i < 10; i++) {
+      fooKnob.get();
+    }
+
+    // Update the file again
+    expectRequest(
+        "getFile",
+        "{'token': 'dummyToken', 'path': '/foo.txt', 'expectedVersion': 2}",
+        "{'status': 'success', 'path': '/foo.txt', 'version': 3, 'createDate': 1000, 'modDate': 3000," +
+            "'content': '{\\'foo\\': \\'300K\\'}'}");
+    try {
+      Thread.sleep(1000); // must sleep for longer than HostedParameterFile's minimum inter-request delay
+    } catch (InterruptedException ex) {
+      ex.printStackTrace();
+    }
+
+    // Dummy calls
+    assertEquals(300000L, (long) fooKnob.get());
+    for (int i = 0; i < 5; i++) {
+      fooKnob.get();
+    }
+
+    // Ensure that after the 100-call threshold for caching, we only called Converter on the 2 updates.
+    assertEquals(102, converterAccessCount);
+  }
+
+  public class TestLongKnob extends Knob {
+    public TestLongKnob(java.lang.String valueKey, java.lang.Long defaultValue, ConfigurationFile ... files) {
+      super(valueKey, defaultValue, KnobTest::toLongWithSIForTests, files);
+    }
+  }
+
+  public static java.lang.Long toLongWithSIForTests(Object value) {
+    converterAccessCount++;
+    return Converter.toLongWithSI(value);
+  }
+
+  /**
    * Test of layering multiple files.
    */
   @Test public void testLayering() throws IOException, InterruptedException {
@@ -447,7 +521,7 @@ public class KnobTest extends KnobTestBase {
       put("  2DAYS"               , 172800000000000L);
     }};
 
-    positiveTests.forEach((k,v) -> assertEquals(Converter.parseNanos(k), (long) v));
+    positiveTests.forEach((k,v) -> assertEquals(Converter.parseNanos(k), v));
 
     HashSet<String> negativeTests = new HashSet<String>(){{
       add("134nanoos");
