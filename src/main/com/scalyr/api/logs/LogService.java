@@ -54,6 +54,7 @@ public class LogService extends ScalyrService {
    *     all calls to uploadEvents with a given session ID.
    * @param events The events to upload (a JSON array).
    * @param threadInfos Optional; contains information for the threads referenced in the events array.
+   * @param enableGzip Optional; enable gzip compression on the upload.
    *
    * @return The JSON-formatted response from the server. See <a href='https://www.scalyr.com/help/api'>scalyr.com/help/api</a>.
    *
@@ -61,7 +62,7 @@ public class LogService extends ScalyrService {
    * @throws ScalyrNetworkException
    */
   public JSONObject uploadEvents(String sessionId, JSONObject sessionInfo,
-      JSONStreamAware events, JSONArray threadInfos)
+      JSONStreamAware events, JSONArray threadInfos, boolean enableGzip)
       throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
 
@@ -74,7 +75,15 @@ public class LogService extends ScalyrService {
     if (threadInfos != null && threadInfos.size() > 0)
       parameters.put("threads", threadInfos);
 
-    return invokeApi("addEvents", parameters);
+    return invokeApi("addEvents", parameters, enableGzip);
+  }
+
+  /**
+   * uploadEvents() wrapper with enableGzip set to default value.
+   */
+  public JSONObject uploadEvents(String sessionId, JSONObject sessionInfo,
+                                 JSONStreamAware events, JSONArray threadInfos) {
+    return uploadEvents(sessionId, sessionInfo, events, threadInfos, Events.ENABLE_GZIP_BY_DEFAULT);
   }
 
   public static final int SPAN_TYPE_LEAF  = 0;

@@ -16,9 +16,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
+import java.util.zip.GZIPInputStream;
 
 /**
  * AbstractHttpClient implementation based on the Apache HTTP client library.
+ * Has Gzip compression capability.
  */
 public class ApacheHttpClient extends AbstractHttpClient {
   /**
@@ -31,6 +33,9 @@ public class ApacheHttpClient extends AbstractHttpClient {
   private String responseContentType;
   private String responseEncoding;
 
+  /**
+   * Version of constructor with desired Content-Encoding passed in.
+   */
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, String contentEncoding) throws IOException {
     if (connectionManager == null) {
@@ -58,6 +63,8 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
     if (contentEncoding != null && contentEncoding.length() > 0)
       request.setHeader("Content-Encoding", contentEncoding);
+      // As of now, we don't need to 'request' compressed responses from Tomcat.
+      // request.setHeader("Accept-Encoding", contentEncoding + ", identity");
 
     ByteArrayEntity inputEntity = new ByteArrayEntity(requestBody, 0, requestBodyLength);
     inputEntity.setContentType(contentType);
@@ -71,6 +78,14 @@ public class ApacheHttpClient extends AbstractHttpClient {
     responseStream = (responseEntity != null) ? responseEntity.getContent() : null;
     responseContentType = (responseEntity != null && responseEntity.getContentType() != null) ? responseEntity.getContentType().getValue() : null;
     responseEncoding = (responseEntity != null && responseEntity.getContentEncoding() != null) ? responseEntity.getContentEncoding().getValue() : null;
+  }
+
+  /**
+   * Version of constructor with a Gzip Compression toggle, rather than a freely settable content-encoding.
+   */
+  public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
+                          byte[] requestBody, int requestBodyLength, String contentType, boolean enableGzip) throws IOException {
+    this(url, requestLength, closeConnections, options, requestBody, requestBodyLength, contentType, enableGzip ? "gzip" : null);
   }
 
   private static void createConnectionManager() {
@@ -96,7 +111,9 @@ public class ApacheHttpClient extends AbstractHttpClient {
   }
 
 
-  @Override public InputStream getInputStream() {
+  @Override public InputStream getInputStream() throws IOException {
+    // As of now, gzip compression is disabled on Tomcat's responses to the Java client, so no need to check for gzip encoding.
+    // return getResponseEncoding().contains("gzip") ? new GZIPInputStream(responseStream) : responseStream;
     return responseStream;
   }
 

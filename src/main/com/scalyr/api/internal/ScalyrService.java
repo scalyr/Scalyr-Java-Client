@@ -24,6 +24,7 @@ import com.scalyr.api.TuningConstants;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.json.JSONParser;
 import com.scalyr.api.json.JSONParser.ByteScanner;
+import com.scalyr.api.logs.Events;
 import com.scalyr.api.logs.Severity;
 
 import java.io.ByteArrayOutputStream;
@@ -143,8 +144,15 @@ public abstract class ScalyrService {
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
+  public JSONObject invokeApi(String methodName, JSONObject parameters, boolean enableGzip) {
+    return invokeApiX(methodName, parameters, enableGzip).response;
+  }
+
+  /**
+   * Overloading invokeApi() with enableGzip set to default value.
+   */
   public JSONObject invokeApi(String methodName, JSONObject parameters) {
-    return invokeApiX(methodName, parameters).response;
+    return invokeApiX(methodName, parameters, Events.ENABLE_GZIP_BY_DEFAULT).response;
   }
 
   /**
@@ -160,9 +168,16 @@ public abstract class ScalyrService {
    *
    * @throws ScalyrException
    * @throws ScalyrNetworkException
+   */
+  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, boolean enableGzip) {
+    return invokeApiX(methodName, parameters, new RpcOptions(), enableGzip);
+  }
+
+  /**
+   * Overloading 3-parameter invokeApiX() with enableGzip set to default value.
    */
   public InvokeApiResult invokeApiX(String methodName, JSONObject parameters) {
-    return invokeApiX(methodName, parameters, new RpcOptions());
+    return invokeApiX(methodName, parameters, Events.ENABLE_GZIP_BY_DEFAULT);
   }
 
   /**
@@ -179,7 +194,7 @@ public abstract class ScalyrService {
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
-  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options) {
+  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options, boolean enableGzip) {
     // Produce a shuffled copy of the server addresses, so that load is distributed
     // across the servers.
     int N = serverAddresses.length;
@@ -200,7 +215,7 @@ public abstract class ScalyrService {
       String serverAddress = shuffled[serverIndex];
       long requestStartTimeMs = ScalyrUtil.currentTimeMillis();
       try {
-        return invokeApiOnServer(serverAddress, methodName, parameters, options);
+        return invokeApiOnServer(serverAddress, methodName, parameters, options, enableGzip);
       } catch (ScalyrNetworkException ex) {
         // Fall into the loop and retry the operation on the next server.
         // If there are no more servers, or our deadline has expired, then
@@ -227,6 +242,13 @@ public abstract class ScalyrService {
             "invokeApi: " + methodName + " failed on " + serverAddress + "; will retry", ex);
       }
     }
+  }
+
+  /**
+   * Overloading 4-parameter invokeApiX() with enableGzip set to default value.
+   */
+  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options) {
+    return invokeApiX(methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT);
   }
 
   /**
@@ -289,7 +311,7 @@ public abstract class ScalyrService {
    * @throws ScalyrNetworkException
    */
   protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters,
-      RpcOptions options) {
+      RpcOptions options, boolean enableGzip) {
     AbstractHttpClient httpClient = null;
 
     long timeBeforeCreatingClient = System.nanoTime();
@@ -319,9 +341,9 @@ public abstract class ScalyrService {
 
           byte[] byteArray = requestBuffer.toByteArray();
           httpClient = new ApacheHttpClient(url, requestLength, closeConnections, options, byteArray, byteArray.length,
-                                            "application/json", null);
+                                            "application/json", enableGzip);
         } else {
-          httpClient = new JavaNetHttpClient(url, requestLength, closeConnections, options, "application/json", null);
+          httpClient = new JavaNetHttpClient(url, requestLength, closeConnections, options, "application/json", enableGzip);
 
           OutputStream output = httpClient.getOutputStream();
           parameters.writeJSONBytes(output);
@@ -422,6 +444,13 @@ public abstract class ScalyrService {
         httpClient.disconnect();
       }
     }
+  }
+
+  /**
+   * Overloading invokeApiOnServer() with enableGzip set to default value.
+   */
+  protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters, RpcOptions options) {
+    return invokeApiOnServer(serverAddress, methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT);
   }
 
   public static void throwIfErrorStatus(JSONObject responseJson) {

@@ -30,6 +30,12 @@ public class Events {
   private static AtomicReference<EventUploader> uploaderInstance = new AtomicReference<EventUploader>();
 
   /**
+   * Whether to enable gzip compression on uploads by default.
+   * TODO: Decide whether to enable or not.
+   */
+  public final static boolean ENABLE_GZIP_BY_DEFAULT = false;
+
+  /**
    * The most recent value passed to setEventFilter. We store this here, in addition to in the
    * EventUploader, in case setEventFilter is called before init().
    */
@@ -103,6 +109,22 @@ public class Events {
     instance.eventFilter = eventFilter;
 
     uploaderInstance.set(instance);
+  }
+
+  /**
+   * Enable Gzip compression in the uploader.
+   */
+  public static void enableGzip() {
+    EventUploader instance = uploaderInstance.get();
+    instance.enableGzip = true;
+  }
+
+  /**
+   * Disable Gzip compression in the uploader.
+   */
+  public static void disableGzip() {
+    EventUploader instance = uploaderInstance.get();
+    instance.enableGzip = false;
   }
 
   /**
