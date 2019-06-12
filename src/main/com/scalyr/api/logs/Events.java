@@ -31,9 +31,8 @@ public class Events {
 
   /**
    * Whether to enable gzip compression on uploads by default.
-   * TODO: Decide whether to enable or not.
    */
-  public final static boolean ENABLE_GZIP_BY_DEFAULT = false;
+  public final static boolean ENABLE_GZIP_BY_DEFAULT = true;
 
   /**
    * The most recent value passed to setEventFilter. We store this here, in addition to in the
@@ -494,5 +493,6 @@ public class Events {
     EventUploader instance = new EventUploader(logService, memoryLimit, artificialSessionId, autoUpload, null, true, reportThreadNames);
     uploaderInstance.set(instance);
     instance.eventFilter = eventFilter;
+    instance.enableGzip = Events.ENABLE_GZIP_BY_DEFAULT;
   }
 }

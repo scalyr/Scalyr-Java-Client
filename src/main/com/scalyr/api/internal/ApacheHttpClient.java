@@ -4,6 +4,7 @@ import com.scalyr.api.internal.ScalyrService.RpcOptions;
 import com.scalyr.api.knobs.Knob;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
@@ -63,12 +64,17 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
     if (contentEncoding != null && contentEncoding.length() > 0)
       request.setHeader("Content-Encoding", contentEncoding);
-      // As of now, we don't need to 'request' compressed responses from Tomcat.
+      // As of now, we don't need to 'request' compressed responses from Scalyr.
       // request.setHeader("Accept-Encoding", contentEncoding + ", identity");
 
     ByteArrayEntity inputEntity = new ByteArrayEntity(requestBody, 0, requestBodyLength);
     inputEntity.setContentType(contentType);
-    request.setEntity(inputEntity);
+
+    if ("gzip".equals(contentEncoding)) {
+      request.setEntity(new GzipCompressingEntity(inputEntity));
+    } else {
+      request.setEntity(inputEntity);
+    }
 
     request.setConfig(configBuilder.build());
 
@@ -82,6 +88,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
   /**
    * Version of constructor with a Gzip Compression toggle, rather than a freely settable content-encoding.
+   * If enableGzip is true, Content-Type gets set to "application/gzip" and Content-Encoding is null.
    */
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, boolean enableGzip) throws IOException {
@@ -112,7 +119,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
 
   @Override public InputStream getInputStream() throws IOException {
-    // As of now, gzip compression is disabled on Tomcat's responses to the Java client, so no need to check for gzip encoding.
+    // As of now, gzip compression is disabled on Scalyr's responses to the Java client, so no need to check for gzip encoding.
     // return getResponseEncoding().contains("gzip") ? new GZIPInputStream(responseStream) : responseStream;
     return responseStream;
   }
