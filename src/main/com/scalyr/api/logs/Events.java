@@ -115,6 +115,9 @@ public class Events {
    */
   public static void enableGzip() {
     EventUploader instance = uploaderInstance.get();
+    if (instance == null)
+      throw new RuntimeException("Call Events.init() before this method");
+    
     instance.enableGzip = true;
   }
 
@@ -123,6 +126,9 @@ public class Events {
    */
   public static void disableGzip() {
     EventUploader instance = uploaderInstance.get();
+    if (instance == null)
+      throw new RuntimeException("Call Events.init() before this method");
+
     instance.enableGzip = false;
   }
 
