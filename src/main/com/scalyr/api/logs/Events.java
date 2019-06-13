@@ -116,8 +116,8 @@ public class Events {
   public static void enableGzip() {
     EventUploader instance = uploaderInstance.get();
     if (instance == null)
-      throw new RuntimeException("Call Events.init() before this method");
-    
+      throw new RuntimeException("Call Events.init() before Events.enableGzip()");
+
     instance.enableGzip = true;
   }
 
@@ -127,7 +127,7 @@ public class Events {
   public static void disableGzip() {
     EventUploader instance = uploaderInstance.get();
     if (instance == null)
-      throw new RuntimeException("Call Events.init() before this method");
+      throw new RuntimeException("Call Events.init() before Events.disableGzip()");
 
     instance.enableGzip = false;
   }
@@ -140,7 +140,7 @@ public class Events {
   public static void setCloseConnections(boolean value) {
     EventUploader instance = uploaderInstance.get();
     if (instance == null)
-      throw new RuntimeException("Call Events.init() before this method");
+      throw new RuntimeException("Call Events.init() before Events.setCloseConnections()");
 
     instance.logService.closeConnections = value;
   }
@@ -160,7 +160,7 @@ public class Events {
   public static void setExplicitlyDisconnect(boolean value) {
     EventUploader instance = uploaderInstance.get();
     if (instance == null)
-      throw new RuntimeException("Call Events.init() before this method");
+      throw new RuntimeException("Call Events.init() before Events.setExplicitlyDisconnect()");
 
     instance.logService.explicitlyDisconnect = value;
   }
