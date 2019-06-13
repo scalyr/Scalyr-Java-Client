@@ -47,5 +47,9 @@ public class LogsTestBase extends ScalyrApiTestBase {
     @Override public JSONObject invokeApi(String methodName, JSONObject parameters) {
       return mockServer.invokeApi(methodName, parameters);
     }
+
+    @Override public JSONObject invokeApi(String methodName, JSONObject parameters, boolean enableGzip) {
+      return mockServer.invokeApi(methodName, parameters);
+    }
   }
 }
