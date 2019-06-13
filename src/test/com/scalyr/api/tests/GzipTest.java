@@ -21,15 +21,18 @@ import static org.junit.Assert.assertFalse;
  */
 @Ignore public class GzipTest extends LogsTestBase {
 
+  String apiLogWriteKey = "0erYhZEXU0F0Apu1FKm6LAu7UOn/2ULSGOTri64i1WBU-";
+  String serverAddress = "http://qatesting.scalyr.com";
+
   @Test public void testGzipOnJavaNetHttpClient() {
     // Put appropriate log write token into LogService()
-    LogService testService = new LogService("0rXw/66WWhDPKouk0rZDkePU7D6bWpoQTOGYFxH/K1yc-");
+    LogService testService = new LogService(apiLogWriteKey);
     // Either put localhost here, or a particular Scalyr environment.
-    testService = testService.setServerAddress("http://localhost:8080");
+    testService = testService.setServerAddress(serverAddress);
 
     Events._reset("testGzipSession", testService, 999999, false, true);
-    // Enable Gzip if not enabled by default
-    if (!Events.ENABLE_GZIP_BY_DEFAULT) Events.enableGzip();
+    // Enable Gzip in case it's not enabled by default
+    Events.enableGzip();
 
     Events.info(new EventAttributes("tag", "testWithGzipJava", "foo1", "bla1", "foo2", "bla2"));
     Events.flush();
@@ -39,13 +42,13 @@ import static org.junit.Assert.assertFalse;
     Knob.setDefaultFiles(new ConfigurationFile[0]);
 
     // Put appropriate log write token into LogService()
-    LogService testService = new LogService("0rXw/66WWhDPKouk0rZDkePU7D6bWpoQTOGYFxH/K1yc-");
+    LogService testService = new LogService(apiLogWriteKey);
     // Either put localhost here, or a particular Scalyr environment.
-    testService = testService.setServerAddress("http://localhost:8080");
+    testService = testService.setServerAddress(serverAddress);
 
     Events._reset("testGzipSession", testService, 999999, false, true);
-    // Enable Gzip if not enabled by default
-    if (!Events.ENABLE_GZIP_BY_DEFAULT) Events.enableGzip();
+    // Enable Gzip in case it's not enabled by default
+    Events.enableGzip();
 
     // Turn on usage of ApacheHTTPClient
     TuningConstants.useApacheHttpClientForEventUploader = new Knob.Boolean("foo", true);
