@@ -21,13 +21,14 @@ import static org.junit.Assert.assertFalse;
  */
 @Ignore public class GzipTest extends LogsTestBase {
 
+  // Put appropriate log write token here.
   String apiLogWriteKey = "0erYhZEXU0F0Apu1FKm6LAu7UOn/2ULSGOTri64i1WBU-";
+
+  // Either put localhost here, or a particular Scalyr environment.
   String serverAddress = "http://qatesting.scalyr.com";
 
   @Test public void testGzipOnJavaNetHttpClient() {
-    // Put appropriate log write token into LogService()
     LogService testService = new LogService(apiLogWriteKey);
-    // Either put localhost here, or a particular Scalyr environment.
     testService = testService.setServerAddress(serverAddress);
 
     Events._reset("testGzipSession", testService, 999999, false, true);
@@ -41,9 +42,7 @@ import static org.junit.Assert.assertFalse;
   @Test public void testGzipOnApacheHttpClient() {
     Knob.setDefaultFiles(new ConfigurationFile[0]);
 
-    // Put appropriate log write token into LogService()
     LogService testService = new LogService(apiLogWriteKey);
-    // Either put localhost here, or a particular Scalyr environment.
     testService = testService.setServerAddress(serverAddress);
 
     Events._reset("testGzipSession", testService, 999999, false, true);
