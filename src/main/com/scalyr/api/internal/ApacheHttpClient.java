@@ -70,11 +70,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
     ByteArrayEntity inputEntity = new ByteArrayEntity(requestBody, 0, requestBodyLength);
     inputEntity.setContentType(contentType);
 
-    if ("gzip".equals(contentEncoding)) {
-      request.setEntity(new GzipCompressingEntity(inputEntity));
-    } else {
-      request.setEntity(inputEntity);
-    }
+    request.setEntity("gzip".equals(contentEncoding) ? new GzipCompressingEntity(inputEntity) : inputEntity);
 
     request.setConfig(configBuilder.build());
 
