@@ -88,7 +88,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
   /**
    * Version of constructor with a Gzip Compression toggle, rather than a freely settable content-encoding.
-   * If enableGzip is true, Content-Type gets set to "application/gzip" and Content-Encoding is null.
+   * If enableGzip is true, Content-Encoding is set to "gzip".
    */
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, boolean enableGzip) throws IOException {

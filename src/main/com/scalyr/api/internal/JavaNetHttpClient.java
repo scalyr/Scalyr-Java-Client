@@ -17,7 +17,7 @@ import java.util.zip.GZIPInputStream;
 public class JavaNetHttpClient extends AbstractHttpClient {
   private HttpURLConnection connection;
   private InputStream responseStream;
-  private boolean enableGzip = false;
+  private boolean enableGzip;
 
   /**
    * Version of constructor with desired Content-Encoding passed in.
@@ -31,8 +31,7 @@ public class JavaNetHttpClient extends AbstractHttpClient {
     connection.setConnectTimeout(options.connectionTimeoutMs);
     connection.setReadTimeout(options.readTimeoutMs);
 
-    if ("application/gzip".equals(contentType) || "gzip".equals(contentEncoding))
-      enableGzip = true;
+    enableGzip = "gzip".equals(contentEncoding);
 
     if (closeConnections)
       connection.setRequestProperty("connection", "close");
@@ -51,11 +50,11 @@ public class JavaNetHttpClient extends AbstractHttpClient {
 
   /**
    * Version of constructor with a Gzip Compression toggle, rather than a freely settable content-encoding.
-   * If enableGzip is true, Content-Type gets set to "application/gzip" and Content-Encoding is null.
+   * If enableGzip is true, Content-Encoding is set to "gzip".
    */
   public JavaNetHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                            String contentType, boolean enableGzip) throws IOException {
-    this(url, requestLength, closeConnections, options, enableGzip ? "application/gzip" : contentType, enableGzip ? "gzip" : null);
+    this(url, requestLength, closeConnections, options, contentType, enableGzip ? "gzip" : null);
   }
 
   @Override public OutputStream getOutputStream() throws IOException {
