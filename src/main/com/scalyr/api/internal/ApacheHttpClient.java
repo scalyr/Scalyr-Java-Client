@@ -76,9 +76,13 @@ public class ApacheHttpClient extends AbstractHttpClient {
     response = httpClient.execute(request);
 
     HttpEntity responseEntity = response.getEntity();
-    responseStream = (responseEntity != null) ? responseEntity.getContent() : null;
     responseContentType = (responseEntity != null && responseEntity.getContentType() != null) ? responseEntity.getContentType().getValue() : null;
     responseEncoding = (responseEntity != null && responseEntity.getContentEncoding() != null) ? responseEntity.getContentEncoding().getValue() : null;
+    if (responseEntity != null) {
+      if (responseEncoding != null && responseEncoding.contains("gzip")) {
+        responseStream = new GZIPInputStream(responseEntity.getContent());
+      } else responseStream = responseEntity.getContent();
+    } else responseStream = null;
   }
 
   /**
@@ -113,9 +117,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
   }
 
 
-  @Override public InputStream getInputStream() throws IOException {
-    if (getResponseEncoding() != null && getResponseEncoding().contains("gzip"))
-      return new GZIPInputStream(responseStream);
+  @Override public InputStream getInputStream() {
     return responseStream;
   }
 
