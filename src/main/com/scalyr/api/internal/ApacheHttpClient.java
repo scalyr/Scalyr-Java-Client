@@ -81,8 +81,12 @@ public class ApacheHttpClient extends AbstractHttpClient {
     if (responseEntity != null) {
       if (responseEncoding != null && responseEncoding.contains("gzip")) {
         responseStream = new GZIPInputStream(responseEntity.getContent());
-      } else responseStream = responseEntity.getContent();
-    } else responseStream = null;
+      } else {
+        responseStream = responseEntity.getContent();
+      }
+    } else {
+        responseStream = null;
+    }
   }
 
   /**
