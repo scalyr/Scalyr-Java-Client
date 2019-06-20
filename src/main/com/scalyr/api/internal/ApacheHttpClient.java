@@ -2,6 +2,7 @@ package com.scalyr.api.internal;
 
 import com.scalyr.api.internal.ScalyrService.RpcOptions;
 import com.scalyr.api.knobs.Knob;
+import jdk.internal.util.xml.impl.Input;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.GzipCompressingEntity;
@@ -78,15 +79,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
     HttpEntity responseEntity = response.getEntity();
     responseContentType = (responseEntity != null && responseEntity.getContentType() != null) ? responseEntity.getContentType().getValue() : null;
     responseEncoding = (responseEntity != null && responseEntity.getContentEncoding() != null) ? responseEntity.getContentEncoding().getValue() : null;
-    if (responseEntity != null) {
-      if (responseEncoding != null && responseEncoding.contains("gzip")) {
-        responseStream = new GZIPInputStream(responseEntity.getContent());
-      } else {
-        responseStream = responseEntity.getContent();
-      }
-    } else {
-        responseStream = null;
-    }
+    responseStream = getResponseStream(responseEntity, responseEncoding);
   }
 
   /**
@@ -96,6 +89,19 @@ public class ApacheHttpClient extends AbstractHttpClient {
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, boolean enableGzip) throws IOException {
     this(url, requestLength, closeConnections, options, requestBody, requestBodyLength, contentType, enableGzip ? "gzip" : null);
+  }
+
+
+  private InputStream getResponseStream(HttpEntity responseEntity, String responseEncoding) throws IOException {
+    if (responseEntity != null) {
+      if (responseEncoding != null && responseEncoding.contains("gzip")) {
+        return new GZIPInputStream(responseEntity.getContent());
+      } else {
+        return responseEntity.getContent();
+      }
+    } else {
+      return null;
+    }
   }
 
   private static void createConnectionManager() {

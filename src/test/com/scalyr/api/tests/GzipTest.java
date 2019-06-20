@@ -22,10 +22,10 @@ import static org.junit.Assert.assertFalse;
 @Ignore public class GzipTest extends LogsTestBase {
 
   // Put appropriate log write token here.
-  String apiLogWriteKey = "0erYhZEXU0F0Apu1FKm6LAu7UOn/2ULSGOTri64i1WBU-";
+  String apiLogWriteKey = "";
 
-  // Either put localhost here, or a particular Scalyr environment.
-  String serverAddress = "http://qatesting.scalyr.com";
+  // Either put localhost here, or a particular Scalyr environment. Remember to use "https" for staging and prod.
+  String serverAddress = "https://scalyr.com";
 
   @Test public void testGzipOnJavaNetHttpClient() {
     LogService testService = new LogService(apiLogWriteKey);
