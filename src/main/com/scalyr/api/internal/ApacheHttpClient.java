@@ -2,7 +2,6 @@ package com.scalyr.api.internal;
 
 import com.scalyr.api.internal.ScalyrService.RpcOptions;
 import com.scalyr.api.knobs.Knob;
-import jdk.internal.util.xml.impl.Input;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.GzipCompressingEntity;
