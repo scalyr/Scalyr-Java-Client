@@ -507,7 +507,9 @@ public class Knob {
     }
 
     private static java.lang.Long calculateDefaultTime(java.lang.Long defaultValue, TimeUnit defaultTimeUnit) {
-      return (defaultValue != null && defaultTimeUnit != null) ? (java.lang.Long) TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit) : defaultValue;
+      if (defaultValue != null && defaultTimeUnit != null)
+        return TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit);
+      else return defaultValue;
     }
 
     //--------------------------------------------------------------------------------
