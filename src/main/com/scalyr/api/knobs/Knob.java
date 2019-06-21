@@ -503,7 +503,11 @@ public class Knob {
 
     public Duration(java.lang.String valueKey, java.lang.Long defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
       // We always store default value in Nanoseconds. If TimeUnit is null, assume defaultValue is in nanoseconds.
-      super(valueKey, defaultTimeUnit != null ? TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit) : defaultValue, Converter::parseNanos, files);
+      super(valueKey, calculateDefaultTime(defaultValue, defaultTimeUnit), Converter::parseNanos, files);
+    }
+
+    private static java.lang.Long calculateDefaultTime(java.lang.Long defaultValue, TimeUnit defaultTimeUnit) {
+      return (defaultValue != null && defaultTimeUnit != null) ? (java.lang.Long) TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit) : defaultValue;
     }
 
     //--------------------------------------------------------------------------------
