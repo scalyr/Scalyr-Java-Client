@@ -526,7 +526,9 @@ public class Knob {
     }
 
     @Override public java.time.Duration getWithTimeout(java.lang.Long timeoutInMs, boolean bypassCache) throws ScalyrDeadlineException {
-      return java.time.Duration.of((long) super.getWithTimeout(timeoutInMs, bypassCache), ChronoUnit.NANOS);
+      java.lang.Long value = (long) super.getWithTimeout(timeoutInMs, bypassCache);
+      if (value == null) return null;
+      return java.time.Duration.of(value, ChronoUnit.NANOS);
     }
 
     @Override public Duration expireHint(java.lang.String dateStr) {
