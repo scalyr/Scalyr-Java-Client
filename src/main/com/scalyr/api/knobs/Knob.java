@@ -538,19 +538,18 @@ public class Knob {
     // New Methods
     //--------------------------------------------------------------------------------
 
-    public long nanos()   { return (long) super.getWithTimeout(null, false); }
+    public java.lang.Long nanos()   { return convertOrNull(TimeUnit.NANOSECONDS);  }
+    public java.lang.Long micros()  { return convertOrNull(TimeUnit.MICROSECONDS); }
+    public java.lang.Long millis()  { return convertOrNull(TimeUnit.MILLISECONDS); }
+    public java.lang.Long seconds() { return convertOrNull(TimeUnit.SECONDS);      }
+    public java.lang.Long minutes() { return convertOrNull(TimeUnit.MINUTES);      }
+    public java.lang.Long hours()   { return convertOrNull(TimeUnit.HOURS);        }
+    public java.lang.Long days()    { return convertOrNull(TimeUnit.DAYS);         }
 
-    public long micros()  { return TimeUnit.MICROSECONDS.convert(nanos(), TimeUnit.NANOSECONDS); }
-
-    public long millis()  { return TimeUnit.MILLISECONDS.convert(nanos(), TimeUnit.NANOSECONDS); }
-
-    public long seconds() { return TimeUnit.SECONDS.convert(nanos(),      TimeUnit.NANOSECONDS); }
-
-    public long minutes() { return TimeUnit.MINUTES.convert(nanos(),      TimeUnit.NANOSECONDS); }
-
-    public long hours()   { return TimeUnit.HOURS.convert(nanos(),        TimeUnit.NANOSECONDS); }
-
-    public long days()    { return TimeUnit.DAYS.convert(nanos(),         TimeUnit.NANOSECONDS); }
+    private java.lang.Long convertOrNull(TimeUnit desiredUnits) {
+      java.lang.Long value = (java.lang.Long) super.getWithTimeout(null, false);
+      return value != null ? desiredUnits.convert(value, TimeUnit.NANOSECONDS) : null;
+    }
   }
 
   /**
@@ -585,16 +584,21 @@ public class Knob {
     // Returns are doubles (for cases such as calling getKB() on '500B', which will yield a decimal).
     //-----------------------------------------------------------------------------------------------
 
-    public double getB()   { return this.get().doubleValue();        } // Byte
-    public double getKB()  { return this.getB() / 1000D;             } // Kilobyte
-    public double getKiB() { return this.getB() / 1024D;             } // Kibibyte
-    public double getMB()  { return this.getB() / Math.pow(10, 6);   } // Megabyte
-    public double getMiB() { return this.getB() / Math.pow(2, 20);   } // Mebibyte
-    public double getGB()  { return this.getB() / Math.pow(10, 9);   } // Gigabyte
-    public double getGiB() { return this.getB() / Math.pow(2, 30);   } // Gibibyte
-    public double getTB()  { return this.getB() / Math.pow(10, 12);  } // Terabyte
-    public double getTiB() { return this.getB() / Math.pow(2, 40);   } // Tebibyte
-    public double getPB()  { return this.getB() / Math.pow(10, 15);  } // Petabyte
-    public double getPiB() { return this.getB() / Math.pow(2, 50);   } // Pebibyte
+    public java.lang.Double getB()   { return divideOrNull(1D);                } // Byte
+    public java.lang.Double getKB()  { return divideOrNull(1000D);             } // Kilobyte
+    public java.lang.Double getKiB() { return divideOrNull(1024D);             } // Kibibyte
+    public java.lang.Double getMB()  { return divideOrNull(Math.pow(10, 6));   } // Megabyte
+    public java.lang.Double getMiB() { return divideOrNull(Math.pow(2, 20));   } // Mebibyte
+    public java.lang.Double getGB()  { return divideOrNull(Math.pow(10, 9));   } // Gigabyte
+    public java.lang.Double getGiB() { return divideOrNull(Math.pow(2, 30));   } // Gibibyte
+    public java.lang.Double getTB()  { return divideOrNull(Math.pow(10, 12));  } // Terabyte
+    public java.lang.Double getTiB() { return divideOrNull(Math.pow(2, 40));   } // Tebibyte
+    public java.lang.Double getPB()  { return divideOrNull(Math.pow(10, 15));  } // Petabyte
+    public java.lang.Double getPiB() { return divideOrNull(Math.pow(2, 50));   } // Pebibyte
+
+    private java.lang.Double divideOrNull(java.lang.Double divideBy) {
+      java.lang.Long value = get();
+      return value != null ? value.doubleValue() / divideBy : null;
+    }
   }
 }

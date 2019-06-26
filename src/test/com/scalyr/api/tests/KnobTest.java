@@ -562,21 +562,21 @@ public class KnobTest extends KnobTestBase {
 
     Knob.Duration value2min = new Knob.Duration("time1", 1L, TimeUnit.SECONDS, paramFile);
 
-    assertEquals(120000L,       value2min.millis());
-    assertEquals(120L,          value2min.seconds());
+    assertEquals((Long) 120000L,       value2min.millis());
+    assertEquals((Long) 120L,          value2min.seconds());
     assertEquals(120000000000L, value2min.get().toNanos());
 
     //ALL possible tests on 3day knob
 
     Knob.Duration value3days = new Knob.Duration("time3", 3L, TimeUnit.DAYS, paramFile);
 
-    assertEquals(259200000000L,       value3days.micros());
-    assertEquals(259200L,             value3days.seconds());
-    assertEquals(259200000000000L,    value3days.nanos());
-    assertEquals(259200000L,          value3days.millis());
-    assertEquals(4320L,               value3days.minutes());
-    assertEquals(72L,                 value3days.hours());
-    assertEquals(3L,                  value3days.days());
+    assertEquals((Long) 259200000000L,       value3days.micros());
+    assertEquals((Long) 259200L,             value3days.seconds());
+    assertEquals((Long) 259200000000000L,    value3days.nanos());
+    assertEquals((Long) 259200000L,          value3days.millis());
+    assertEquals((Long) 4320L,               value3days.minutes());
+    assertEquals((Long) 72L,                 value3days.hours());
+    assertEquals((Long) 3L,                  value3days.days());
     assertEquals(259200000000000L,    value3days.get().toNanos());
     assertEquals(259200000L,          value3days.get().toMillis());
     assertEquals(4320L,               value3days.get().toMinutes());
@@ -586,7 +586,7 @@ public class KnobTest extends KnobTestBase {
     //Testing default value on knob with no config
 
     Knob.Duration unconfiguredKnob = new Knob.Duration("nonexistent label", 1L, TimeUnit.DAYS, paramFile);
-    assertEquals(24L, unconfiguredKnob.hours());
+    assertEquals((Long) 24L, unconfiguredKnob.hours());
     assertEquals(1L, unconfiguredKnob.get().toDays());
 
     //Exception testing
