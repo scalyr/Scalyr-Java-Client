@@ -584,19 +584,19 @@ public class Knob {
     // Returns are doubles (for cases such as calling getKB() on '500B', which will yield a decimal).
     //-----------------------------------------------------------------------------------------------
 
-    public java.lang.Double getB()   { return divideOrNull(1D);                } // Byte
-    public java.lang.Double getKB()  { return divideOrNull(1000D);             } // Kilobyte
-    public java.lang.Double getKiB() { return divideOrNull(1024D);             } // Kibibyte
-    public java.lang.Double getMB()  { return divideOrNull(Math.pow(10, 6));   } // Megabyte
-    public java.lang.Double getMiB() { return divideOrNull(Math.pow(2, 20));   } // Mebibyte
-    public java.lang.Double getGB()  { return divideOrNull(Math.pow(10, 9));   } // Gigabyte
-    public java.lang.Double getGiB() { return divideOrNull(Math.pow(2, 30));   } // Gibibyte
-    public java.lang.Double getTB()  { return divideOrNull(Math.pow(10, 12));  } // Terabyte
-    public java.lang.Double getTiB() { return divideOrNull(Math.pow(2, 40));   } // Tebibyte
-    public java.lang.Double getPB()  { return divideOrNull(Math.pow(10, 15));  } // Petabyte
-    public java.lang.Double getPiB() { return divideOrNull(Math.pow(2, 50));   } // Pebibyte
+    public java.lang.Double getB()   { return convertOrNull(1D);                } // Byte
+    public java.lang.Double getKB()  { return convertOrNull(1000D);             } // Kilobyte
+    public java.lang.Double getKiB() { return convertOrNull(1024D);             } // Kibibyte
+    public java.lang.Double getMB()  { return convertOrNull(Math.pow(10, 6));   } // Megabyte
+    public java.lang.Double getMiB() { return convertOrNull(Math.pow(2, 20));   } // Mebibyte
+    public java.lang.Double getGB()  { return convertOrNull(Math.pow(10, 9));   } // Gigabyte
+    public java.lang.Double getGiB() { return convertOrNull(Math.pow(2, 30));   } // Gibibyte
+    public java.lang.Double getTB()  { return convertOrNull(Math.pow(10, 12));  } // Terabyte
+    public java.lang.Double getTiB() { return convertOrNull(Math.pow(2, 40));   } // Tebibyte
+    public java.lang.Double getPB()  { return convertOrNull(Math.pow(10, 15));  } // Petabyte
+    public java.lang.Double getPiB() { return convertOrNull(Math.pow(2, 50));   } // Pebibyte
 
-    private java.lang.Double divideOrNull(java.lang.Double divideBy) {
+    private java.lang.Double convertOrNull(double divideBy) {
       java.lang.Long value = get();
       return value != null ? value.doubleValue() / divideBy : null;
     }
