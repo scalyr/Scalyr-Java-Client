@@ -538,15 +538,16 @@ public class Knob {
     // New Methods
     //--------------------------------------------------------------------------------
 
-    public java.lang.Long nanos()   { return convertOrNull(TimeUnit.NANOSECONDS);  }
-    public java.lang.Long micros()  { return convertOrNull(TimeUnit.MICROSECONDS); }
-    public java.lang.Long millis()  { return convertOrNull(TimeUnit.MILLISECONDS); }
-    public java.lang.Long seconds() { return convertOrNull(TimeUnit.SECONDS);      }
-    public java.lang.Long minutes() { return convertOrNull(TimeUnit.MINUTES);      }
-    public java.lang.Long hours()   { return convertOrNull(TimeUnit.HOURS);        }
-    public java.lang.Long days()    { return convertOrNull(TimeUnit.DAYS);         }
+    public java.lang.Long nanos()   { return convertToLongTime(TimeUnit.NANOSECONDS);  }
+    public java.lang.Long micros()  { return convertToLongTime(TimeUnit.MICROSECONDS); }
+    public java.lang.Long millis()  { return convertToLongTime(TimeUnit.MILLISECONDS); }
+    public java.lang.Long seconds() { return convertToLongTime(TimeUnit.SECONDS);      }
+    public java.lang.Long minutes() { return convertToLongTime(TimeUnit.MINUTES);      }
+    public java.lang.Long hours()   { return convertToLongTime(TimeUnit.HOURS);        }
+    public java.lang.Long days()    { return convertToLongTime(TimeUnit.DAYS);         }
 
-    private java.lang.Long convertOrNull(TimeUnit desiredUnits) {
+    /** Converts Knob value to a Long in the desired units, and checks for null value. */
+    private java.lang.Long convertToLongTime(TimeUnit desiredUnits) {
       java.lang.Long value = (java.lang.Long) super.getWithTimeout(null, false);
       return value != null ? desiredUnits.convert(value, TimeUnit.NANOSECONDS) : null;
     }
@@ -600,19 +601,19 @@ public class Knob {
     }
 
     public java.lang.Long   getB()   { return (java.lang.Long) super.getWithTimeout(null, false); } // Byte
-    public java.lang.Double getKB()  { return convertToDouble(1000D);                             } // Kilobyte
-    public java.lang.Double getKiB() { return convertToDouble(1024D);                             } // Kibibyte
-    public java.lang.Double getMB()  { return convertToDouble(Math.pow(10, 6));                   } // Megabyte
-    public java.lang.Double getMiB() { return convertToDouble(Math.pow(2, 20));                   } // Mebibyte
-    public java.lang.Double getGB()  { return convertToDouble(Math.pow(10, 9));                   } // Gigabyte
-    public java.lang.Double getGiB() { return convertToDouble(Math.pow(2, 30));                   } // Gibibyte
-    public java.lang.Double getTB()  { return convertToDouble(Math.pow(10, 12));                  } // Terabyte
-    public java.lang.Double getTiB() { return convertToDouble(Math.pow(2, 40));                   } // Tebibyte
-    public java.lang.Double getPB()  { return convertToDouble(Math.pow(10, 15));                  } // Petabyte
-    public java.lang.Double getPiB() { return convertToDouble(Math.pow(2, 50));                   } // Pebibyte
+    public java.lang.Double getKB()  { return convertToDoubleSize(1000D);                         } // Kilobyte
+    public java.lang.Double getKiB() { return convertToDoubleSize(1024D);                         } // Kibibyte
+    public java.lang.Double getMB()  { return convertToDoubleSize(Math.pow(10, 6));               } // Megabyte
+    public java.lang.Double getMiB() { return convertToDoubleSize(Math.pow(2, 20));               } // Mebibyte
+    public java.lang.Double getGB()  { return convertToDoubleSize(Math.pow(10, 9));               } // Gigabyte
+    public java.lang.Double getGiB() { return convertToDoubleSize(Math.pow(2, 30));               } // Gibibyte
+    public java.lang.Double getTB()  { return convertToDoubleSize(Math.pow(10, 12));              } // Terabyte
+    public java.lang.Double getTiB() { return convertToDoubleSize(Math.pow(2, 40));               } // Tebibyte
+    public java.lang.Double getPB()  { return convertToDoubleSize(Math.pow(10, 15));              } // Petabyte
+    public java.lang.Double getPiB() { return convertToDoubleSize(Math.pow(2, 50));               } // Pebibyte
 
     /** Converts to double with a unit conversion, and checks for null value. */
-    private java.lang.Double convertToDouble(double divideBy) {
+    private java.lang.Double convertToDoubleSize(double divideBy) {
       java.lang.Long value = (java.lang.Long) super.getWithTimeout(null, false);
       return value != null ? value.doubleValue() / divideBy : null;
     }
