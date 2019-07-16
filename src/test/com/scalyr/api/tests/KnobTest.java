@@ -554,9 +554,14 @@ public class KnobTest extends KnobTestBase {
         "{'token': 'dummyToken', 'path': '/foo.txt'}",
         "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
             "'content': '{\\'time1\\': \\' 2     mins\\', \\'time2\\': \\'415nanos\\', \\'invalidTime1\\': \\'3d2 secs\\'," +
-            "\\'invalidTime2\\': \\'32 seuycs\\', \\'invalidTime3\\': \\'3d2secs\\'}'}");
+            "\\'invalidTime2\\': \\'32 seuycs\\', \\'invalidTime3\\': \\'3d2secs\\', \\'negativeInt\\': \\'-2sec\\'}'}");
 
     ConfigurationFile paramFile = factory.getFile("/foo.txt");
+
+    //Test negative values
+
+    Knob.Duration negativeInt = new Knob.Duration("negativeInt", 1L, TimeUnit.SECONDS, paramFile);
+    assertEquals((Long) (-2000L), negativeInt.millis());
 
     //Random tests on 2min knob
 
