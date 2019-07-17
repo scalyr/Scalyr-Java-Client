@@ -548,22 +548,27 @@ public class KnobTest extends KnobTestBase {
     // Part 2: Testing functionality of knobs made from a config file
     //--------------------------------------------------------------------------------
 
-    //Config file simulation
+    // Config file simulation
     expectRequest(
         "getFile",
         "{'token': 'dummyToken', 'path': '/foo.txt'}",
         "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
-            "'content': '{\\'time1\\': \\' 2     mins\\', \\'time2\\': \\'415nanos\\', \\'invalidTime1\\': \\'3d2 secs\\'," +
-            "\\'invalidTime2\\': \\'32 seuycs\\', \\'invalidTime3\\': \\'3d2secs\\', \\'negativeInt\\': \\'-2sec\\'}'}");
+            "'content': '{\\'time1\\': \\' 2     mins\\', \\'time2\\': \\'415nanos\\', \\'negativeKnob\\': \\'-2sec\\'," +
+            "\\'positiveKnob\\': \\'+2sec\\', \\'invalidTime1\\': \\'3d2 secs\\', \\'invalidTime2\\': \\'32 seuycs\\'," +
+            "\\'invalidTime3\\': \\'3d2secs\\', \\'invalidSign1\\': \\'--2min\\', \\'invalidSign2\\': \\'2+ sec\\'," +
+            "\\'invalidSign3\\': \\'-+ 3 days\\', \\'invalidSign4\\': \\'3+3days\\'}'}");
 
     ConfigurationFile paramFile = factory.getFile("/foo.txt");
 
-    //Test negative values
+    // Test signed values
 
-    Knob.Duration negativeInt = new Knob.Duration("negativeInt", 1L, TimeUnit.SECONDS, paramFile);
-    assertEquals((Long) (-2000L), negativeInt.millis());
+    Knob.Duration negativeKnob = new Knob.Duration("negativeKnob", 1L, TimeUnit.SECONDS, paramFile);
+    assertEquals((Long) (-2000L), negativeKnob.millis());
 
-    //Random tests on 2min knob
+    Knob.Duration positiveKnob = new Knob.Duration("positiveKnob", 1L, TimeUnit.SECONDS, paramFile);
+    assertEquals((Long) 2000L, positiveKnob.millis());
+
+    // Random tests on 2min knob
 
     Knob.Duration value2min = new Knob.Duration("time1", 1L, TimeUnit.SECONDS, paramFile);
 
@@ -571,7 +576,7 @@ public class KnobTest extends KnobTestBase {
     assertEquals((Long) 120L,          value2min.seconds());
     assertEquals(120000000000L, value2min.get().toNanos());
 
-    //ALL possible tests on 3day knob
+    // ALL possible tests on 3day knob
 
     Knob.Duration value3days = new Knob.Duration("time3", 3L, TimeUnit.DAYS, paramFile);
 
@@ -588,13 +593,13 @@ public class KnobTest extends KnobTestBase {
     assertEquals(72L,                 value3days.get().toHours());
     assertEquals(3L,                  value3days.get().toDays());
 
-    //Testing default value on knob with no config
+    // Testing default value on knob with no config
 
     Knob.Duration unconfiguredKnob = new Knob.Duration("nonexistent label", 1L, TimeUnit.DAYS, paramFile);
     assertEquals((Long) 24L, unconfiguredKnob.hours());
     assertEquals(1L, unconfiguredKnob.get().toDays());
 
-    //Exception testing
+    // Exception testing
 
     Knob.Duration invalidKnob1 = new Knob.Duration("invalidTime1", 3L, TimeUnit.DAYS, paramFile);
     fails(invalidKnob1::hours, RuntimeException.class);
@@ -604,6 +609,18 @@ public class KnobTest extends KnobTestBase {
 
     Knob.Duration invalidKnob3 = new Knob.Duration("invalidTime3", 3L, TimeUnit.DAYS, paramFile);
     fails(invalidKnob3::hours, RuntimeException.class);
+
+    Knob.Duration invalidSign1 = new Knob.Duration("invalidSign1", 3L, TimeUnit.DAYS, paramFile);
+    fails(invalidSign1::hours, RuntimeException.class);
+
+    Knob.Duration invalidSign2 = new Knob.Duration("invalidSign2", 3L, TimeUnit.DAYS, paramFile);
+    fails(invalidSign2::get, RuntimeException.class);
+
+    Knob.Duration invalidSign3 = new Knob.Duration("invalidSign3", 3L, TimeUnit.DAYS, paramFile);
+    fails(invalidSign3::hours, RuntimeException.class);
+
+    Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3L, TimeUnit.DAYS, paramFile);
+    fails(invalidSign4::minutes, RuntimeException.class);
   }
 
   @Test public void testGetLongGetIntWithSI() {
