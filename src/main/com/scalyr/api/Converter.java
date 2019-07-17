@@ -241,7 +241,7 @@ public class Converter {
     short state = 0;
     char c;
     boolean seenNumber = false;
-    boolean negative = false;
+    boolean seenSign = false;
     String magnitude = "";
     String units = "";
     final String exceptionMessage = "Invalid duration format: \"" + input + "\"";
@@ -251,9 +251,9 @@ public class Converter {
       c = input.charAt(i);
       switch (state) {
         case 0: // Trying to parse number
-          if (c == '-') {
-            if (seenNumber) throw new RuntimeException(exceptionMessage);
-            else negative = true;
+          if (c == '-' || c == '+') {
+            if (seenNumber || seenSign) throw new RuntimeException(exceptionMessage);
+            seenSign = true;
           } else if (Character.isDigit(c)) {
             seenNumber = true;
           } else if (!seenNumber) { // If we've hit a non-# character before getting any numbers
@@ -279,7 +279,7 @@ public class Converter {
 
     // If no units were in the string, we interpret it as nanoseconds. Otherwise get and apply conversion from map.
     return TimeUnit.NANOSECONDS.convert(java.lang.Long.parseLong(magnitude),
-              units.length() == 0 ? TimeUnit.NANOSECONDS : timeUnitMap.get(units));// * (negative ? -1L : 1L);
+              units.length() == 0 ? TimeUnit.NANOSECONDS : timeUnitMap.get(units));
   }
 
   private static final Map<java.lang.String, TimeUnit> timeUnitMap = new HashMap<java.lang.String, TimeUnit>(){{
