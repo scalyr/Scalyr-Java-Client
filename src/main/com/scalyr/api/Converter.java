@@ -226,7 +226,7 @@ public class Converter {
    * Parses a config string for a Duration Knob and returns its value in Nanoseconds.
    * See {@link com.scalyr.api.knobs.Knob.Duration} DurationKnob javadocs for usage/rules.
    */
-  public static Long parseNanos(Object value) {
+  public static Long parseNanos(Object value) throws NumberFormatException {
     if (value == null)            return null;
     if (value instanceof Integer) return (long)(int)(Integer)value;
     if (value instanceof Long)    return (Long)value;
@@ -254,7 +254,7 @@ public class Converter {
           if (c == '-' || c == '+') {
             if (seenNumber || seenSign) throw new RuntimeException(exceptionMessage);
             seenSign = true;
-          } else if (Character.isDigit(c)) {
+          } else if (Character.isDigit(c) || c == '.') {
             seenNumber = true;
           } else if (!seenNumber) { // If we've hit a non-# character before getting any numbers
             throw new RuntimeException(exceptionMessage);
@@ -278,8 +278,8 @@ public class Converter {
     }
 
     // If no units were in the string, we interpret it as nanoseconds. Otherwise get and apply conversion from map.
-    return TimeUnit.NANOSECONDS.convert(java.lang.Long.parseLong(magnitude),
-              units.length() == 0 ? TimeUnit.NANOSECONDS : timeUnitMap.get(units));
+    return (long) (java.lang.Double.parseDouble(magnitude)
+            * TimeUnit.NANOSECONDS.convert(1, units.length() == 0 ? TimeUnit.NANOSECONDS : timeUnitMap.get(units)));
   }
 
   private static final Map<java.lang.String, TimeUnit> timeUnitMap = new HashMap<java.lang.String, TimeUnit>(){{

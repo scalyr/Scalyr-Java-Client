@@ -487,29 +487,29 @@ public class Knob {
    *
    * METHODS TO GET VALUE:
    *
-   *  - We provide long-valued accessors that return commonly used units:
+   *  - We provide double-valued accessors that return commonly used units:
    *    .nanos(), .micros(), .millis(), .seconds(), .minutes(), .hours(), .days()
    *  - The standard Knob.get() method is also overridden to return a java.time.Duration object,
    *    which can be used with its native methods such as .toNanos() to get a Long value.
    *
    * EXAMPLE USAGE:
    *
-   *  // Assume that config file has {myLabel: "1day"}
-   *  Knob.Duration myKnob = new Knob.Duration("myLabel", 1L, TimeUnit.SECONDS, paramFile);
-   *  long hoursInADay = myKnob.hours(); //Will be 24 hours
+   *  // Assume that config file has {myLabel: "1.5hr"}
+   *  Knob.Duration myKnob = new Knob.Duration("myLabel", 1D, TimeUnit.SECONDS, paramFile);
+   *  double 90min = myKnob.minutes(); // Will be 90
    *
    */
   public static class Duration extends Knob {
 
-    public Duration(java.lang.String valueKey, java.lang.Long defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
+    public Duration(java.lang.String valueKey, java.lang.Double defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
       // We always store default value in Nanoseconds. If TimeUnit is null, assume defaultValue is in nanoseconds.
       super(valueKey, calculateDefaultTime(defaultValue, defaultTimeUnit), Converter::parseNanos, files);
     }
 
-    private static java.lang.Long calculateDefaultTime(java.lang.Long defaultValue, TimeUnit defaultTimeUnit) {
+    private static java.lang.Long calculateDefaultTime(java.lang.Double defaultValue, TimeUnit defaultTimeUnit) {
       if (defaultValue != null && defaultTimeUnit != null)
-        return TimeUnit.NANOSECONDS.convert(defaultValue, defaultTimeUnit);
-      else return defaultValue;
+        return (long) (defaultValue * TimeUnit.NANOSECONDS.convert(1, defaultTimeUnit));
+      else return defaultValue == null ? null : defaultValue.longValue();
     }
 
     //--------------------------------------------------------------------------------
@@ -538,18 +538,18 @@ public class Knob {
     // New Methods
     //--------------------------------------------------------------------------------
 
-    public java.lang.Long nanos()   { return convertToLongTime(TimeUnit.NANOSECONDS);  }
-    public java.lang.Long micros()  { return convertToLongTime(TimeUnit.MICROSECONDS); }
-    public java.lang.Long millis()  { return convertToLongTime(TimeUnit.MILLISECONDS); }
-    public java.lang.Long seconds() { return convertToLongTime(TimeUnit.SECONDS);      }
-    public java.lang.Long minutes() { return convertToLongTime(TimeUnit.MINUTES);      }
-    public java.lang.Long hours()   { return convertToLongTime(TimeUnit.HOURS);        }
-    public java.lang.Long days()    { return convertToLongTime(TimeUnit.DAYS);         }
+    public java.lang.Double nanos()   { return convertToDoubleTime(TimeUnit.NANOSECONDS);  }
+    public java.lang.Double micros()  { return convertToDoubleTime(TimeUnit.MICROSECONDS); }
+    public java.lang.Double millis()  { return convertToDoubleTime(TimeUnit.MILLISECONDS); }
+    public java.lang.Double seconds() { return convertToDoubleTime(TimeUnit.SECONDS);      }
+    public java.lang.Double minutes() { return convertToDoubleTime(TimeUnit.MINUTES);      }
+    public java.lang.Double hours()   { return convertToDoubleTime(TimeUnit.HOURS);        }
+    public java.lang.Double days()    { return convertToDoubleTime(TimeUnit.DAYS);         }
 
-    /** Converts Knob value to a Long in the desired units, and checks for null value. */
-    private java.lang.Long convertToLongTime(TimeUnit desiredUnits) {
+    /** Converts Knob value to a Double in the desired units, and checks for null value. */
+    private java.lang.Double convertToDoubleTime(TimeUnit desiredUnits) {
       java.lang.Long value = (java.lang.Long) super.getWithTimeout(null, false);
-      return value != null ? desiredUnits.convert(value, TimeUnit.NANOSECONDS) : null;
+      return value != null ? value.doubleValue() / TimeUnit.NANOSECONDS.convert(1, desiredUnits) : null;
     }
   }
 

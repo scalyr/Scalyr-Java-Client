@@ -554,72 +554,93 @@ public class KnobTest extends KnobTestBase {
         "{'token': 'dummyToken', 'path': '/foo.txt'}",
         "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
             "'content': '{\\'time1\\': \\' 2     mins\\', \\'time2\\': \\'415nanos\\', \\'negativeKnob\\': \\'-2sec\\'," +
-            "\\'positiveKnob\\': \\'+2sec\\', \\'invalidTime1\\': \\'3d2 secs\\', \\'invalidTime2\\': \\'32 seuycs\\'," +
-            "\\'invalidTime3\\': \\'3d2secs\\', \\'invalidSign1\\': \\'--2min\\', \\'invalidSign2\\': \\'2+ sec\\'," +
+            "\\'positiveKnob\\': \\'+2sec\\', \\'decimal1\\': \\'+2.4sec\\', \\'decimal2\\': \\'3.5 hr\\'," +
+            "\\'decimal3\\': \\'4.32ms\\', \\'badDecimal1\\': \\'2..5sec\\', \\'badDecimal2\\': \\'2.. sec\\'," +
+            "\\'invalidTime1\\': \\'3d2 secs\\', \\'invalidTime2\\': \\'32 seuycs\\', \\'invalidTime3\\': \\'3d2secs\\'," +
+            "\\'invalidSign1\\': \\'--2min\\', \\'invalidSign2\\': \\'2+ sec\\'," +
             "\\'invalidSign3\\': \\'-+ 3 days\\', \\'invalidSign4\\': \\'3+3days\\'}'}");
 
     ConfigurationFile paramFile = factory.getFile("/foo.txt");
 
     // Test signed values
 
-    Knob.Duration negativeKnob = new Knob.Duration("negativeKnob", 1L, TimeUnit.SECONDS, paramFile);
-    assertEquals((Long) (-2000L), negativeKnob.millis());
+    Knob.Duration negativeKnob = new Knob.Duration("negativeKnob", 1D, TimeUnit.SECONDS, paramFile);
+    assertEquals((Double) (-2000D), negativeKnob.millis());
 
-    Knob.Duration positiveKnob = new Knob.Duration("positiveKnob", 1L, TimeUnit.SECONDS, paramFile);
-    assertEquals((Long) 2000L, positiveKnob.millis());
+    Knob.Duration positiveKnob = new Knob.Duration("positiveKnob", 1D, TimeUnit.SECONDS, paramFile);
+    assertEquals((Double) 2000D, positiveKnob.millis());
+
+    // Test decimal knobs
+
+    Knob.Duration decimal1 = new Knob.Duration("decimal1", 1D, TimeUnit.SECONDS, paramFile);
+    assertEquals((Double) 2400D,       decimal1.millis());
+    assertEquals((Double) 2.4D,        decimal1.seconds());
+
+    Knob.Duration decimal2 = new Knob.Duration("decimal2", 1D, TimeUnit.SECONDS, paramFile);
+    assertEquals((Double) (3.5D * 60 * 60),  decimal2.seconds());
+    assertEquals((Double) (3.5 / 24),        decimal2.days());
 
     // Random tests on 2min knob
 
-    Knob.Duration value2min = new Knob.Duration("time1", 1L, TimeUnit.SECONDS, paramFile);
+    Knob.Duration value2min = new Knob.Duration("time1", 1D, TimeUnit.SECONDS, paramFile);
 
-    assertEquals((Long) 120000L,       value2min.millis());
-    assertEquals((Long) 120L,          value2min.seconds());
+    assertEquals((Double) 120000D,       value2min.millis());
+    assertEquals((Double) 120D,          value2min.seconds());
     assertEquals(120000000000L, value2min.get().toNanos());
 
     // ALL possible tests on 3day knob
 
-    Knob.Duration value3days = new Knob.Duration("time3", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration value3days = new Knob.Duration("time3", 3D, TimeUnit.DAYS, paramFile);
 
-    assertEquals((Long) 259200000000L,       value3days.micros());
-    assertEquals((Long) 259200L,             value3days.seconds());
-    assertEquals((Long) 259200000000000L,    value3days.nanos());
-    assertEquals((Long) 259200000L,          value3days.millis());
-    assertEquals((Long) 4320L,               value3days.minutes());
-    assertEquals((Long) 72L,                 value3days.hours());
-    assertEquals((Long) 3L,                  value3days.days());
+    assertEquals((Double) 259200000000D,       value3days.micros());
+    assertEquals((Double) 259200D,             value3days.seconds());
+    assertEquals((Double) 259200000000000D,    value3days.nanos());
+    assertEquals((Double) 259200000D,          value3days.millis());
+    assertEquals((Double) 4320D,               value3days.minutes());
+    assertEquals((Double) 72D,                 value3days.hours());
+    assertEquals((Double) 3D,                  value3days.days());
     assertEquals(259200000000000L,    value3days.get().toNanos());
     assertEquals(259200000L,          value3days.get().toMillis());
     assertEquals(4320L,               value3days.get().toMinutes());
     assertEquals(72L,                 value3days.get().toHours());
     assertEquals(3L,                  value3days.get().toDays());
 
-    // Testing default value on knob with no config
+    // Testing default values on knob with no config
 
-    Knob.Duration unconfiguredKnob = new Knob.Duration("nonexistent label", 1L, TimeUnit.DAYS, paramFile);
-    assertEquals((Long) 24L, unconfiguredKnob.hours());
-    assertEquals(1L, unconfiguredKnob.get().toDays());
+    Knob.Duration unconfiguredKnob = new Knob.Duration("nonexistent label", 1D, TimeUnit.DAYS, paramFile);
+    assertEquals((Double) 24D, unconfiguredKnob.hours());
+    assertEquals(1L,  unconfiguredKnob.get().toDays());
+
+    Knob.Duration unconfiguredKnob2 = new Knob.Duration("nonexistent label", 1.5D, TimeUnit.HOURS, paramFile);
+    assertEquals((Double) (90 * 60D), unconfiguredKnob2.seconds());
 
     // Exception testing
 
-    Knob.Duration invalidKnob1 = new Knob.Duration("invalidTime1", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration badDecimal1 = new Knob.Duration("badDecimal1", 3D, TimeUnit.DAYS, paramFile);
+    fails(badDecimal1::hours, RuntimeException.class);
+
+    Knob.Duration badDecimal2 = new Knob.Duration("badDecimal2", 3D, TimeUnit.DAYS, paramFile);
+    fails(badDecimal2::get, RuntimeException.class);
+
+    Knob.Duration invalidKnob1 = new Knob.Duration("invalidTime1", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidKnob1::hours, RuntimeException.class);
 
-    Knob.Duration invalidKnob2 = new Knob.Duration("invalidTime2", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidKnob2 = new Knob.Duration("invalidTime2", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidKnob2::get, RuntimeException.class);
 
-    Knob.Duration invalidKnob3 = new Knob.Duration("invalidTime3", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidKnob3 = new Knob.Duration("invalidTime3", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidKnob3::hours, RuntimeException.class);
 
-    Knob.Duration invalidSign1 = new Knob.Duration("invalidSign1", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidSign1 = new Knob.Duration("invalidSign1", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidSign1::hours, RuntimeException.class);
 
-    Knob.Duration invalidSign2 = new Knob.Duration("invalidSign2", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidSign2 = new Knob.Duration("invalidSign2", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidSign2::get, RuntimeException.class);
 
-    Knob.Duration invalidSign3 = new Knob.Duration("invalidSign3", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidSign3 = new Knob.Duration("invalidSign3", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidSign3::hours, RuntimeException.class);
 
-    Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3L, TimeUnit.DAYS, paramFile);
+    Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3D, TimeUnit.DAYS, paramFile);
     fails(invalidSign4::minutes, RuntimeException.class);
   }
 
