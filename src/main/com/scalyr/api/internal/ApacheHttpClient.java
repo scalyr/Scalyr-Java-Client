@@ -62,9 +62,10 @@ public class ApacheHttpClient extends AbstractHttpClient {
     request.setHeader("errorStatus", "always200");
     request.setHeader("X-XSS-Protection", "1; mode=block");
 
-    if (contentEncoding != null && contentEncoding.length() > 0)
+    if (contentEncoding != null && contentEncoding.length() > 0) {
       request.setHeader("Content-Encoding", contentEncoding);
       request.setHeader("Accept-Encoding", contentEncoding + ", identity");
+    }
 
     ByteArrayEntity inputEntity = new ByteArrayEntity(requestBody, 0, requestBodyLength);
     inputEntity.setContentType(contentType);

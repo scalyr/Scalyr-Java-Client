@@ -40,9 +40,10 @@ public class JavaNetHttpClient extends AbstractHttpClient {
     connection.setRequestProperty("Content-Length", "" + requestLength);
     connection.setRequestProperty("errorStatus", "always200");
 
-    if (contentEncoding != null && contentEncoding.length() > 0)
+    if (contentEncoding != null && contentEncoding.length() > 0) {
       connection.setRequestProperty("Content-Encoding", contentEncoding);
       connection.setRequestProperty("Accept-Encoding", contentEncoding + ", identity");
+    }
 
     connection.setDoOutput(true);
   }
