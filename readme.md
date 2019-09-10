@@ -20,7 +20,7 @@ Add the following dependency to your project's pom.xml (check [Maven Central](ht
         <dependency>
             <groupId>com.scalyr</groupId>
             <artifactId>scalyr-client</artifactId>
-            <version>6.0.15</version>
+            <version>6.0.17</version>
         </dependency>
 
 
