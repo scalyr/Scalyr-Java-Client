@@ -18,6 +18,7 @@
 package com.scalyr.api.tests;
 
 import com.scalyr.api.LogHook;
+import com.scalyr.api.TuningConstants;
 import com.scalyr.api.internal.Logging;
 import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.internal.SimpleRateLimiter;
@@ -25,8 +26,10 @@ import com.scalyr.api.knobs.ConfigurationFile;
 import com.scalyr.api.knobs.ConfigurationFileFactory;
 import com.scalyr.api.knobs.Knob;
 import com.scalyr.api.knobs.LocalConfigurationFile;
+import com.scalyr.api.knobs.util.Whitelist;
 import com.scalyr.api.logs.Severity;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -42,6 +45,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import java.util.HashMap;
+import java.util.stream.IntStream;
+
 import com.scalyr.api.Converter;
 
 import static org.junit.Assert.*;
@@ -91,6 +96,51 @@ public class KnobTest extends KnobTestBase {
     assertEquals("bazDefault", valueBaz.get());
 
     assertRequestQueueEmpty();
+  }
+
+  /**
+   * Tests registered callbacks in Configuration can be recycled by garbage collector, once the related Knob is no longer used.
+   */
+  @Test public void testCallbackRecycle() {
+    expectRequest(
+      "getFile",
+      "{'token': 'dummyToken', 'path': '/foo.txt'}",
+      "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
+        "'content': '{foo: \\'abc\\', /*comment*/ \\'bar\\': \\'xyz\\'}'}");
+
+    ConfigurationFile paramFile = factory.getFile("/foo.txt");
+
+    // initially no listener is registered.
+    Assert.assertEquals(0, paramFile.updateListeners.size());
+
+    IntStream.range(0, 1000).forEach(i -> createAndUseKnob(paramFile));
+
+    // manually invoke garbage collection, wait for the listeners to be recycled.
+    System.gc();
+    try {
+      Thread.sleep(2000);
+    } catch (InterruptedException ignored){}
+
+    System.gc();
+
+    // verify that all listeners have been removed.
+    Assert.assertEquals(0, paramFile.updateListeners.size());
+  }
+
+  /**
+   * Create two knobs, invoke them several times to make sure the listener is registered, then discard those knobs right away.
+   */
+  private void createAndUseKnob(ConfigurationFile file) {
+    int listeners = file.updateListeners.size();
+
+    Knob.Integer intKnob = new Knob.Integer("intKnob", 0, file);
+    Whitelist whitelist = new Whitelist("whitelist", "*", file);
+    IntStream.range(0, TuningConstants.KNOB_CACHE_THRESHOLD + 1).forEach(i -> {
+      Assert.assertEquals(0, (int)intKnob.get());
+      Assert.assertTrue(whitelist.isInWhitelist("testValue"));
+    });
+
+    Assert.assertEquals(listeners + 2, file.updateListeners.size());
   }
 
   /**
