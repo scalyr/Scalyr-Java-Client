@@ -74,7 +74,7 @@ public abstract class ConfigurationFile {
   /**
    * All callbacks which have been registered to be notified when the file state changes.
    */
-  public WeakHashMap<Consumer<ConfigurationFile>, Boolean> updateListeners = new WeakHashMap<>();
+  public WeakHashMap<Consumer<ConfigurationFile>, Void> updateListeners = new WeakHashMap<>();
 
   /**
    * Time when we last heard a definitive update from the server (or other base repository) regarding
@@ -388,7 +388,7 @@ public abstract class ConfigurationFile {
   public synchronized void addUpdateListener(Consumer<ConfigurationFile> updateListener) {
     verifyNotClosed();
 
-    updateListeners.put(updateListener, true);
+    updateListeners.put(updateListener, null);
   }
 
   /**
