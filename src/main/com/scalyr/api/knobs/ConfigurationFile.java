@@ -28,6 +28,7 @@ import com.scalyr.api.logs.Severity;
 
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -170,7 +171,7 @@ public abstract class ConfigurationFile {
    * the new FileState has an older verson than our current state, do nothing.
    */
   protected void setFileState(FileState value) {
-    List<Consumer<ConfigurationFile>> listenerSnapshot;
+    List<Consumer<ConfigurationFile>> listenerSnapshot = null;
 
     synchronized (this) {
       if (isClosed())
@@ -187,10 +188,27 @@ public abstract class ConfigurationFile {
       noteNewState();
       notifyAll();
 
-      listenerSnapshot = new ArrayList<>(updateListeners.keySet());
+      // `updateListeners` as a WeakHashMap shouldn't throw exceptions when called `keySet` synchronously
+      // adding this loop just for extra safety.
+      int maxRetryLimit = 10;
+      for (int i = 0; i < maxRetryLimit; i++) {
+        try {
+          listenerSnapshot = new ArrayList<>(updateListeners.keySet());
+          break;
+        } catch (Throwable e) {
+          if (i == maxRetryLimit - 1)
+            throw new RuntimeException(e);
+
+          try {
+            TimeUnit.MILLISECONDS.sleep(100);
+          } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+          }
+        }
+      }
     }
 
-    for (Consumer<ConfigurationFile> updateListener : listenerSnapshot) {
+    for (Consumer<ConfigurationFile> updateListener : Objects.requireNonNull(listenerSnapshot)) {
       updateListener.accept(this);
     }
   }

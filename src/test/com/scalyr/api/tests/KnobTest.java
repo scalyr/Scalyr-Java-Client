@@ -42,7 +42,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 import java.util.HashMap;
 import java.util.stream.IntStream;
@@ -113,7 +112,7 @@ public class KnobTest extends KnobTestBase {
     // initially no listener is registered.
     Assert.assertEquals(0, paramFile.updateListeners.size());
 
-    IntStream.range(0, 1000).forEach(i -> createAndUseKnob(paramFile));
+    Assert.assertTrue(IntStream.range(0, 1000).map(i -> createAndUseKnob(paramFile)).max().orElse(0) > 0);
 
     // manually invoke garbage collection, wait for the listeners to be recycled.
     System.gc();
@@ -129,10 +128,10 @@ public class KnobTest extends KnobTestBase {
 
   /**
    * Create two knobs, invoke them several times to make sure the listener is registered, then discard those knobs right away.
+   *
+   * @return size() of {@link ConfigurationFile#updateListeners}, after invoking the knobs.
    */
-  private void createAndUseKnob(ConfigurationFile file) {
-    int listeners = file.updateListeners.size();
-
+  private int createAndUseKnob(ConfigurationFile file) {
     Knob.Integer intKnob = new Knob.Integer("intKnob", 0, file);
     Whitelist whitelist = new Whitelist("whitelist", "*", file);
     IntStream.range(0, TuningConstants.KNOB_CACHE_THRESHOLD + 1).forEach(i -> {
@@ -140,7 +139,7 @@ public class KnobTest extends KnobTestBase {
       Assert.assertTrue(whitelist.isInWhitelist("testValue"));
     });
 
-    Assert.assertEquals(listeners + 2, file.updateListeners.size());
+    return file.updateListeners.size();
   }
 
   /**
