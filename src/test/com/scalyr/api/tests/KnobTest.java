@@ -511,6 +511,35 @@ public class KnobTest extends KnobTestBase {
     assertEquals(-1000000000000000L,  (long) Converter.parseNumberWithSI("-1p"));
   }
 
+  @Test public void testParseRealNumberWithSI() {
+    assertEquals(1234.0             , Converter.parseRealNumberWithSI("1234") , 1e-9);
+    assertEquals(-1234.0            , Converter.parseRealNumberWithSI("-1234"), 1e-9);
+    assertEquals(5000.0             , Converter.parseRealNumberWithSI("5K")   , 1e-9);
+    assertEquals(-5000.0            , Converter.parseRealNumberWithSI("-5K")  , 1e-9);
+    assertEquals(2000000.0          , Converter.parseRealNumberWithSI("2M")   , 1e-9);
+    assertEquals(-2000000.0         , Converter.parseRealNumberWithSI("-2M")  , 1e-9);
+    assertEquals(2000000000.0       , Converter.parseRealNumberWithSI("2G")   , 1e-9);
+    assertEquals(-2000000000.0      , Converter.parseRealNumberWithSI("-2G")  , 1e-9);
+    assertEquals(1000000000000000.0 , Converter.parseRealNumberWithSI("1p")   , 1e-9);
+    assertEquals(-1000000000000000.0, Converter.parseRealNumberWithSI("-1p")  , 1e-9);
+
+    assertEquals(0.1234    , Converter.parseRealNumberWithSI("0.1234")    , 1e-9);
+    assertEquals(1.234     , Converter.parseRealNumberWithSI("1.2340")    , 1e-9);
+    assertEquals(12.34     , Converter.parseRealNumberWithSI("12.3400")   , 1e-9);
+    assertEquals(123.4     , Converter.parseRealNumberWithSI("123.4000")  , 1e-9);
+    assertEquals(1234      , Converter.parseRealNumberWithSI("1234.0000 "), 1e-9);
+    assertEquals(123.4     , Converter.parseRealNumberWithSI("0.1234K")   , 1e-9);
+    assertEquals(-123.4    , Converter.parseRealNumberWithSI("-0.1234K")  , 1e-9);
+    assertEquals(1234      , Converter.parseRealNumberWithSI("1.234K")    , 1e-9);
+    assertEquals(-1234     , Converter.parseRealNumberWithSI("-1.234K")   , 1e-9);
+    assertEquals(1500000.0 , Converter.parseRealNumberWithSI("1.5M")      , 1e-9);
+    assertEquals(-1500000.0, Converter.parseRealNumberWithSI("-1.5M")     , 1e-9);
+
+    fails(() -> Converter.parseRealNumberWithSI(".5M")  , RuntimeException.class);
+    fails(() -> Converter.parseRealNumberWithSI("-.5M") , RuntimeException.class);
+    fails(() -> Converter.parseRealNumberWithSI("0.5MM"), RuntimeException.class);
+  }
+
   /**
    * Listener implementation used in tests.
    */

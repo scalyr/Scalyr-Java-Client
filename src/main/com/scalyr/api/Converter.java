@@ -88,18 +88,31 @@ public class Converter {
   public static Long toLong(Object value) {
     return toLong(value, false);
   }
+
   /**
-   * Convert any numeric type to Double.
+   * Convert any numeric type to Double. If `parseSI` is set to true, try to parse SI units as well.
    * <p>
-   * A null input is returned as-is. Non-numeric inputs trigger an exception.
+   * A null input is returned as-is. Non-numeric inputs trigger an exception. Out-of-range
+   * values trigger undefined behavior.
    */
-  public static Double toDouble(Object value) {
+  public static Double toDouble(Object value, boolean parseSI) {
     if (value == null)            return null;
     if (value instanceof Integer) return (double)(int)(Integer)value;
     if (value instanceof Long)    return (double)(long)(Long)value;
     if (value instanceof Double)  return (Double)value;
 
-    throw new RuntimeException("Can't convert [" + value + "] to Double");
+    if (parseSI)
+      return Converter.parseRealNumberWithSI(value);
+    else
+      throw new RuntimeException("Can't convert [" + value + "] to Long");
+  }
+
+  public static Double toDoubleWithSI(Object value) {
+    return toDouble(value, true);
+  }
+
+  public static Double toDouble(Object value) {
+    return toDouble(value, false);
   }
 
   /**
@@ -135,9 +148,9 @@ public class Converter {
    * 1KB  // 1000 bytes
    * 1KiB // 1024 bytes
    *
-   * the accepted pattern is: [0-9]+[\s]*[[[KMGTP]i?]?B]?
+   * the accepted pattern is: [0-9]+[\s]*[[[KMGTP]i?]?B?]?
    *
-   *    [\s]*[0-9]+[\s]*[[[KMGT]i?]?B]?[\s]*
+   *    [\s]*[0-9]+[\s]*[[[KMGT]i?]?B?]?[\s]*
    *  0   1    2     3       4   5   6   7     0
    */
   public static Long parseNumberWithSI(Object valueWithSIObj) {
@@ -213,6 +226,108 @@ public class Converter {
         case 'G': return numberPart * base * base * base;
         case 'T': return numberPart * base * base * base * base;
         case 'P': return numberPart * base * base * base * base * base;
+      }
+    }
+    throw getSIParseException(valueWithSI);
+  }
+
+  /**
+   * Converts certain pattern of String to disk/memory/network sizes.
+   *
+   * It takes a variety of values:
+   *
+   * 1000 // just number, default SI is bytes
+   * 1KB  // 1000 bytes
+   * 1KiB // 1024 bytes
+   *
+   * the accepted pattern is: -?[0-9]+\.[0-9]*[\s]*[[[KMGTP]i?]?B?]?
+   *
+   *    [\s]*[0-9]+\.?[0-9]*[\s]*[[[KMGTP]i?]?B?]?[\s]*
+   *  0   1    2        3     4      5   6   7    8    0
+   */
+  public static Double parseRealNumberWithSI(Object valueWithSIObj) {
+    ScalyrUtil.Assert(valueWithSIObj != null, "null parameter passed into parseNumberWithSI!");
+    String valueWithSI = valueWithSIObj.toString();
+    double numberPart     = 0;
+    double fractionalPart = 0;
+    double divisor = 1;
+    char multiplier = '\0';
+    boolean withI = false;
+    boolean negative = false;
+    short state = 0;
+    for (int i = 0; i < valueWithSI.length(); i++) {
+      char c = valueWithSI.charAt(i);
+      if (i == 0 && c == '-') {
+        negative = true;
+      } else if (c >= '0' && c <= '9') {
+        switch (state) {
+          case 0:
+          case 1:
+          case 2: state = 2; numberPart     *= 10; numberPart     += c - '0'; break;
+          case 3: state = 3; fractionalPart *= 10; divisor *= 10; fractionalPart += c - '0'; break;
+          default: throw getSIParseException(valueWithSI);
+        }
+      } else if (c == '.') {
+        if (state == 2) {
+          state = 3;
+        } else {
+          throw getSIParseException(valueWithSI);
+        }
+      } else if (c == ' ') {
+        switch (state) {
+          case 0:
+          case 1: state = 1; break;
+          case 2:
+          case 3:
+          case 4: state = 4; break;
+          case 5: state = 8; break;
+          case 7:
+          case 8: break;
+          default: throw getSIParseException(valueWithSI);
+        }
+      } else if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z') {
+        c = c > 'Z' ? (char)(c + 'A' - 'a') : c;
+
+        if  (c == 'K' || c == 'M' || c == 'G' || c == 'T' || c == 'P') {
+          switch (state) {
+            case 2:
+            case 3:
+            case 4: state = 5; multiplier = c; break;
+            default: throw getSIParseException(valueWithSI);
+          }
+        } else if (c == 'I') {
+          switch (state) {
+            case 5: state = 6; withI = true; break;
+            default: throw getSIParseException(valueWithSI);
+          }
+        } else if (c == 'B') {
+          switch (state) {
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6: state = 7; break;
+            default: throw getSIParseException(valueWithSI);
+          }
+        } else {
+          throw getSIParseException(valueWithSI);
+        }
+      } else {
+        throw getSIParseException(valueWithSI);
+      }
+    }
+    double v = (numberPart + (fractionalPart / divisor)) * (negative ? -1 : 1);
+    if (state == 2 || state == 3 || state == 4) {
+      return v;
+    } else if (state == 7 || state == 8 || state == 5) {
+      long base = withI ? 1024 : 1000;
+      switch (multiplier) {
+        case '\0': return v;
+        case  'K': return v * base;
+        case  'M': return v * base * base;
+        case  'G': return v * base * base * base;
+        case  'T': return v * base * base * base * base;
+        case  'P': return v * base * base * base * base * base;
       }
     }
     throw getSIParseException(valueWithSI);
