@@ -470,6 +470,8 @@ public class Knob {
   /**
    * Subclass of Knob for durations, to make writing them nicer (eg. "2 minutes" or "1 DAY").
    *
+   * Knob durations **must** include a unit when read from a config file.
+   *
    * CONFIG FILES:
    *
    *  - In the config file, define value in the format "[DURATION] [UNIT]", eg. "2 minutes" or "4ns" or "450 millis".
@@ -502,7 +504,6 @@ public class Knob {
   public static class Duration extends Knob {
 
     public Duration(java.lang.String valueKey, java.lang.Long defaultValue, TimeUnit defaultTimeUnit, ConfigurationFile ... files) {
-      // We always store default value in Nanoseconds. If TimeUnit is null, assume defaultValue is in nanoseconds.
       super(valueKey, calculateDefaultTime(defaultValue, defaultTimeUnit), Converter::parseNanosRequireUnits, files);
     }
 

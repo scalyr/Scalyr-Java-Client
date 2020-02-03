@@ -562,7 +562,7 @@ public class KnobTest extends KnobTestBase {
     // Part 1: Testing the Parser that converts from String to Nanoseconds
     //--------------------------------------------------------------------------------
 
-    HashMap<String, Long> positiveTests = new HashMap<java.lang.String, Long>(){{
+    HashMap<Object, Long> positiveTests = new HashMap<Object, Long>(){{
       put("134ns"                 , 134L            );
       put("  134    nano  "       , 134L            );
       put("  134 NaNos"           , 134L            );
@@ -599,20 +599,46 @@ public class KnobTest extends KnobTestBase {
       put("  2DAYS"               , 172800000000000L);
     }};
 
+    positiveTests.forEach((k,v) -> assertEquals(Converter.parseNanosRequireUnits(k), v));
+
+    positiveTests.put(134, 134L);
     positiveTests.forEach((k,v) -> assertEquals(Converter.parseNanos(k), v));
 
-    HashSet<String> negativeTests = new HashSet<String>(){{
-      add("134nanoos");
-      add("3 Daays");
+
+    HashSet<Object> negativeTests = new HashSet<Object>(){{
+      add("134nanoos"        );
+      add("3 Daays"          );
       add(" 43 millliseconds");
-      add("2secss");
-      add("1 hrr");
+      add("2secss"           );
+      add("1 hrr"            );
     }};
 
     negativeTests.forEach(k -> {
       boolean exceptionThrown = false;
       try {
         Converter.parseNanos(k);
+      } catch (RuntimeException e) {
+        exceptionThrown = true;
+      }
+      if (!exceptionThrown) {
+        fail("Expected an exception for invalid format, but none thrown.");
+      }
+    });
+
+    negativeTests = new HashSet<Object>(){{
+      add("134nanoos"        );
+      add("3 Daays"          );
+      add(" 43 millliseconds");
+      add("2secss"           );
+      add("1 hrr"            );
+      add("123"              ); // missing units
+      add(123                ); // unsupported type
+    }};
+
+    negativeTests.forEach(k -> {
+      boolean exceptionThrown = false;
+      try {
+        Converter.parseNanosRequireUnits(k);
       } catch (RuntimeException e) {
         exceptionThrown = true;
       }
