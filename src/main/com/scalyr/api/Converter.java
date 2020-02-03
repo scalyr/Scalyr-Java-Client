@@ -337,11 +337,7 @@ public class Converter {
     return new RuntimeException("Can't convert [" + valueWithSI + "]");
   }
 
-  /**
-   * Parses a config string for a Duration Knob and returns its value in Nanoseconds.
-   * See {@link com.scalyr.api.knobs.Knob.Duration} DurationKnob javadocs for usage/rules.
-   */
-  public static Long parseNanos(Object value) {
+  private static Long parseNanos_(Object value, boolean requireUnits) {
     if (value == null)            return null;
     if (value instanceof Integer) return (long)(int)(Integer)value;
     if (value instanceof Long)    return (Long)value;
@@ -391,10 +387,35 @@ public class Converter {
           }
       }
     }
+    if (units.length() == 0 && requireUnits)
+      throw new RuntimeException("Requires units, but no units found");
 
     // If no units were in the string, we interpret it as nanoseconds. Otherwise get and apply conversion from map.
     return TimeUnit.NANOSECONDS.convert(java.lang.Long.parseLong(magnitude),
               units.length() == 0 ? TimeUnit.NANOSECONDS : timeUnitMap.get(units));
+  }
+
+  /**
+   * Parses a config string for a Duration Knob and returns its value in Nanoseconds.
+   * See {@link com.scalyr.api.knobs.Knob.Duration} DurationKnob javadocs for usage/rules.
+   */
+  public static Long parseNanos(Object value) {
+    return parseNanos_(value, false);
+  }
+
+  /**
+   * Parses a config string **with units** for a Duration Knob and returns its value in Nanoseconds.
+   * See {@link com.scalyr.api.knobs.Knob.Duration} DurationKnob javadocs for usage/rules.
+   */
+  public static Long parseNanosRequireUnits(Object value) {
+    if (value == null
+      || value instanceof Integer
+      || value instanceof Long
+      || value instanceof Double) {
+      throw new RuntimeException("Unsupported type, value must be a String");
+    }
+
+    return parseNanos_(value, true);
   }
 
   private static final Map<java.lang.String, TimeUnit> timeUnitMap = new HashMap<java.lang.String, TimeUnit>(){{
