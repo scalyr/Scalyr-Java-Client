@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -124,6 +125,41 @@ public class Knob {
   }
 
   /**
+   * Called whenever converter fails to parse a value
+   */
+  private static BiFunction<Throwable, Object, java.lang.Boolean> defaultOnConversionFailure;
+
+  /**
+   * Specify the default action to take for a converter failure for all Knobs
+   *
+   * e.g. {@code setDefaultOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
+   *
+   * @param action takes in a Throwable that caused the failure, the value that was trying to be converted, and
+   *               returns a boolean of whether the default Knob value should be used
+   */
+  public static void setDefaultOnConversionFailure(BiFunction<Throwable, Object, java.lang.Boolean> action) {
+    defaultOnConversionFailure = action;
+  }
+
+  /**
+   * Called whenever {@link #converter} fails to parse a value
+   */
+  private BiFunction<Throwable, Object, java.lang.Boolean> onConversionFailure;
+
+  /**
+   * Specify the action to take for a converter failure on a per Knob basis
+   *
+   * e.g. {@code setDefaultOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
+   *
+   * @param action takes in a Throwable that caused the failure, the value that was trying to be converted, and
+   *               returns a boolean of whether the default Knob value should be used
+   */
+  public Knob setOnConversionFailure(BiFunction<Throwable, Object, java.lang.Boolean> action) {
+    this.onConversionFailure = action;
+    return this;
+  }
+
+  /**
    * @param key The key to look for (a fieldname of the top-level JSON object in the file), or null to always use defaultValue.
    * @param defaultValue Value to return from {@link #get()} if the file does not exist or does not
    *     contain the key.
@@ -139,7 +175,16 @@ public class Knob {
     }
     this.key = key;
     this.defaultValue = defaultValue;
-    this.converter = converter;
+    this.converter = converter == null ? null : (obj) -> {
+      try {
+        return converter.apply(obj);
+      } catch (Throwable t) {
+        if      (onConversionFailure        != null && onConversionFailure.apply(t, obj)       ) return defaultValue;
+        else if (defaultOnConversionFailure != null && defaultOnConversionFailure.apply(t, obj)) return defaultValue;
+
+        throw t;
+      }
+    };
   }
 
   public Knob(java.lang.String key, Object defaultValue, ConfigurationFile ... files) {

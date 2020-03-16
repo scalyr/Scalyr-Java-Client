@@ -40,6 +40,7 @@ import java.io.StringWriter;
 import java.util.HashSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -60,6 +61,8 @@ public class KnobTest extends KnobTestBase {
 
   @Before @Override public void setup() {
     super.setup();
+
+    Knob.setDefaultOnConversionFailure(null);
 
     paramDir = TestUtils.createTemporaryDirectory();
     paramFactory = ConfigurationFile.makeLocalFileFactory(paramDir, 100);
@@ -736,5 +739,35 @@ public class KnobTest extends KnobTestBase {
     ConfigurationFile paramFile = factory.getFile("/foo.txt");
     assertEquals((int) Knob.getInteger("test", 1, paramFile), 256000);
     assertEquals((long) Knob.getLong("test", 1L, paramFile), 256000L);
+  }
+
+  @Test public void testBadConversionAction() {
+    expectRequest(
+      "getFile",
+      "{'token': 'dummyToken', 'path': '/foo.txt'}",
+      "{'status': 'success', 'path': '/foo.txt', 'version': 1, 'createDate': 1000, 'modDate': 2000," +
+        "'content': '{\\'invalidSign4\\': \\'3+3days\\'}'}");
+
+    ConfigurationFile paramFile = factory.getFile("/foo.txt");
+
+    AtomicInteger calledDefault = new AtomicInteger();
+    Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return false; });
+
+    // misconfigured Knob so calls its defaultBadConversionAction but it still throws
+    Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3L, TimeUnit.DAYS, paramFile);
+    fails(() -> invalidSign4.get().toDays(), RuntimeException.class);
+    assertEquals(1, calledDefault.get());
+
+    // misconfigured Knob so calls its defaultBadConversionAction but now we return the default value
+    Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return true; });
+    assertEquals(3L, invalidSign4.get().toDays());
+    assertEquals(2 , calledDefault.get()        );
+
+    // misconfigured Knob so calls its badConversionAction and we return the default
+    AtomicInteger calledOverride = new AtomicInteger();
+    invalidSign4.setOnConversionFailure((t, o) -> { calledOverride.incrementAndGet(); return true; });
+    assertEquals(3L, invalidSign4.get().toDays());
+    assertEquals(2 , calledDefault.get()        );
+    assertEquals(1 , calledOverride.get()       );
   }
 }
