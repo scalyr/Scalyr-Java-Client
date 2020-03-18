@@ -149,7 +149,7 @@ public class Knob {
   /**
    * Specify the action to take for a converter failure on a per Knob basis
    *
-   * e.g. {@code setDefaultOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
+   * e.g. {@code setOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
    *
    * @param action takes in a Throwable that caused the failure, the value that was trying to be converted, and
    *               returns a boolean of whether the default Knob value should be used
@@ -179,8 +179,13 @@ public class Knob {
       try {
         return converter.apply(obj);
       } catch (Throwable t) {
-        if      (onConversionFailure        != null && onConversionFailure.apply(t, obj)       ) return defaultValue;
-        else if (defaultOnConversionFailure != null && defaultOnConversionFailure.apply(t, obj)) return defaultValue;
+        if (onConversionFailure != null) {
+          if (onConversionFailure.apply(t, obj))
+            return defaultValue;
+        } else if (defaultOnConversionFailure != null) {
+          if (defaultOnConversionFailure.apply(t, obj))
+            return defaultValue;
+        }
 
         throw t;
       }

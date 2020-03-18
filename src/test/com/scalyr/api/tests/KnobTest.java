@@ -753,21 +753,25 @@ public class KnobTest extends KnobTestBase {
     AtomicInteger calledDefault = new AtomicInteger();
     Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return false; });
 
-    // misconfigured Knob so calls its defaultBadConversionAction but it still throws
+    // misconfigured Knob so calls its defaultOnConversionFailure but it still throws
     Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3L, TimeUnit.DAYS, paramFile);
     fails(() -> invalidSign4.get().toDays(), RuntimeException.class);
     assertEquals(1, calledDefault.get());
 
-    // misconfigured Knob so calls its defaultBadConversionAction but now we return the default value
+    // misconfigured Knob so calls its defaultOnConversionFailure but now we return the default value
     Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return true; });
     assertEquals(3L, invalidSign4.get().toDays());
     assertEquals(2 , calledDefault.get()        );
 
-    // misconfigured Knob so calls its badConversionAction and we return the default
+    // misconfigured Knob so calls its onConversionFailure and we return the default
     AtomicInteger calledOverride = new AtomicInteger();
     invalidSign4.setOnConversionFailure((t, o) -> { calledOverride.incrementAndGet(); return true; });
     assertEquals(3L, invalidSign4.get().toDays());
     assertEquals(2 , calledDefault.get()        );
     assertEquals(1 , calledOverride.get()       );
+
+    // misconfigured Knob so calls its onConversionFailure but we throw since we don't return the default
+    invalidSign4.setOnConversionFailure((t, o) -> { calledOverride.incrementAndGet(); return false; });
+    fails(() -> invalidSign4.get().toDays(), RuntimeException.class);
   }
 }
