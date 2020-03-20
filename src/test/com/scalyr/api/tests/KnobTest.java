@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -751,27 +752,34 @@ public class KnobTest extends KnobTestBase {
     ConfigurationFile paramFile = factory.getFile("/foo.txt");
 
     AtomicInteger calledDefault = new AtomicInteger();
-    Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return false; });
+    AtomicReference<String> key  = new AtomicReference<>();
+    Knob.setDefaultOnConversionFailure((k, t) -> { key.set(k); calledDefault.incrementAndGet(); return false; });
 
     // misconfigured Knob so calls its defaultOnConversionFailure but it still throws
     Knob.Duration invalidSign4 = new Knob.Duration("invalidSign4", 3L, TimeUnit.DAYS, paramFile);
     fails(() -> invalidSign4.get().toDays(), RuntimeException.class);
-    assertEquals(1, calledDefault.get());
+    assertEquals(1             , calledDefault.get());
+    assertEquals("invalidSign4", key.get()          );
 
     // misconfigured Knob so calls its defaultOnConversionFailure but now we return the default value
-    Knob.setDefaultOnConversionFailure((t, o) -> { calledDefault.incrementAndGet(); return true; });
-    assertEquals(3L, invalidSign4.get().toDays());
-    assertEquals(2 , calledDefault.get()        );
+    Knob.setDefaultOnConversionFailure((k, t) -> { key.set(k); calledDefault.incrementAndGet(); return true; });
+    assertEquals(3L            , invalidSign4.get().toDays());
+    assertEquals(2             , calledDefault.get()        );
+    assertEquals("invalidSign4", key.get()                  );
 
     // misconfigured Knob so calls its onConversionFailure and we return the default
     AtomicInteger calledOverride = new AtomicInteger();
-    invalidSign4.setOnConversionFailure((t, o) -> { calledOverride.incrementAndGet(); return true; });
-    assertEquals(3L, invalidSign4.get().toDays());
-    assertEquals(2 , calledDefault.get()        );
-    assertEquals(1 , calledOverride.get()       );
+    invalidSign4.setOnConversionFailure((k, t) -> { key.set(k); calledOverride.incrementAndGet(); return true; });
+    assertEquals(3L            , invalidSign4.get().toDays());
+    assertEquals(2             , calledDefault.get()        );
+    assertEquals(1             , calledOverride.get()       );
+    assertEquals("invalidSign4", key.get()                  );
 
     // misconfigured Knob so calls its onConversionFailure but we throw since we don't return the default
-    invalidSign4.setOnConversionFailure((t, o) -> { calledOverride.incrementAndGet(); return false; });
+    invalidSign4.setOnConversionFailure((k, t) -> { key.set(k); calledOverride.incrementAndGet(); return false; });
     fails(() -> invalidSign4.get().toDays(), RuntimeException.class);
+    assertEquals(2             , calledDefault.get()        );
+    assertEquals(2             , calledOverride.get()       );
+    assertEquals("invalidSign4", key.get()                  );
   }
 }

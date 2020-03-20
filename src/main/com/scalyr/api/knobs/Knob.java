@@ -127,34 +127,34 @@ public class Knob {
   /**
    * Called whenever converter fails to parse a value
    */
-  private static BiFunction<Throwable, Object, java.lang.Boolean> defaultOnConversionFailure;
+  private static BiFunction<java.lang.String, Throwable, java.lang.Boolean> defaultOnConversionFailure;
 
   /**
    * Specify the default action to take for a converter failure for all Knobs
    *
-   * e.g. {@code setDefaultOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
+   * e.g. {@code setDefaultOnConversionFailure((key, throwable) -> { logError(key, throwable); return true; });}
    *
-   * @param action takes in a Throwable that caused the failure, the value that was trying to be converted, and
+   * @param action takes in the Knob key, the Throwable that caused the failure, and
    *               returns a boolean of whether the default Knob value should be used
    */
-  public static void setDefaultOnConversionFailure(BiFunction<Throwable, Object, java.lang.Boolean> action) {
+  public static void setDefaultOnConversionFailure(BiFunction<java.lang.String, Throwable, java.lang.Boolean> action) {
     defaultOnConversionFailure = action;
   }
 
   /**
    * Called whenever {@link #converter} fails to parse a value
    */
-  private BiFunction<Throwable, Object, java.lang.Boolean> onConversionFailure;
+  private BiFunction<java.lang.String, Throwable, java.lang.Boolean> onConversionFailure;
 
   /**
    * Specify the action to take for a converter failure on a per Knob basis
    *
-   * e.g. {@code setOnConversionFailure((throwable, value) -> { logError(throwable, value); return true; });}
+   * e.g. {@code setOnConversionFailure((key, throwable) -> { logError(key, throwable); return true; });}
    *
-   * @param action takes in a Throwable that caused the failure, the value that was trying to be converted, and
+   * @param action takes in the Knob key, the Throwable that caused the failure, and
    *               returns a boolean of whether the default Knob value should be used
    */
-  public Knob setOnConversionFailure(BiFunction<Throwable, Object, java.lang.Boolean> action) {
+  public Knob setOnConversionFailure(BiFunction<java.lang.String, Throwable, java.lang.Boolean> action) {
     this.onConversionFailure = action;
     return this;
   }
@@ -180,10 +180,10 @@ public class Knob {
         return converter.apply(obj);
       } catch (Throwable t) {
         if (onConversionFailure != null) {
-          if (onConversionFailure.apply(t, obj))
+          if (onConversionFailure.apply(key, t))
             return defaultValue;
         } else if (defaultOnConversionFailure != null) {
-          if (defaultOnConversionFailure.apply(t, obj))
+          if (defaultOnConversionFailure.apply(key, t))
             return defaultValue;
         }
 
