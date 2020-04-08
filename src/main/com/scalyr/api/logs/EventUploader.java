@@ -549,10 +549,10 @@ public class EventUploader {
       try {
         rawResponse = logService.uploadEvents(sessionId, sessionInfo, eventsToUpload, threadInfos, enableGzip);
       } catch (RuntimeException ex) {
-        logUploadFailure(ex.toString());
+        logUploadFailure(bufferedBytes, ex.toString());
         throw ex;
       } catch (Error ex) {
-        logUploadFailure(ex.toString());
+        logUploadFailure(bufferedBytes, ex.toString());
         throw ex;
       }
 
@@ -572,7 +572,7 @@ public class EventUploader {
 
           discardOldestPendingEvents(bufferedBytes);
         } else {
-          logUploadFailure("Server response had bad status [" + rawStatus + "]; complete text: " + parsedResponse.toString());
+          boolean discarded = logUploadFailure(bufferedBytes, "Server response had bad status [" + rawStatus + "]; complete text: " + parsedResponse.toString());
 
           Logging.log(EventUploader.this, Severity.warning, Logging.tagServerError,
               "Bad response from Scalyr Logs (status [" + status + "], message [" +
@@ -586,12 +586,12 @@ public class EventUploader {
           if (!status.startsWith("error/client/noPermission/accountDisabled")) {
             minUploadIntervalMs *= TuningConstants.UPLOAD_SPACING_FACTOR_ON_BACKOFF;
             minUploadIntervalMs = Math.min(minUploadIntervalMs, TuningConstants.MAX_EVENT_UPLOAD_SPACING_MS);
-          } else {
+          } else if (!discarded) {
             discardOldestPendingEvents(bufferedBytes);
           }
         }
       } catch (JsonParseException ex) {
-        logUploadFailure(ex.toString());
+        logUploadFailure(bufferedBytes, ex.toString());
 
         // This shouldn't occur, as the underlying service framework verifies that the server's
         // response is valid JSON.
@@ -656,30 +656,24 @@ public class EventUploader {
    * It is called for all failure modes, from local exceptions to network problems to error codes returned from the
    * server.
    */
-  void logUploadFailure(String message) {
+  private boolean logUploadFailure(int bufferedBytes, String message) {
+    boolean discarded = false;
     long nowMs = ScalyrUtil.currentTimeMillis();
     if (uploadFailuresStartMs == null)
       uploadFailuresStartMs = nowMs;
     else {
       if (_discardBatchesAfterPersistentFailures &&
           nowMs - uploadFailuresStartMs >= TuningConstants.DISCARD_EVENT_BATCH_AFTER_PERSISTENT_FAILURE_SECONDS * 1000) {
-        int firstChunkSize;
 
         // We've persistently failed to upload this chunk for a long time. There may be something fundamentally
         // wrong with it. In any event, the current server implementation is unable to accept events that are more
         // than a few minutes old. Either way, we have nothing to gain by holding onto this data chunk. So we'll
         // discard it, in hopes of helping the upload process to resume.
-        synchronized (uploadSynchronizer) {
-          synchronized (chunkSizes) {
-            firstChunkSize = chunkSizes.getFirst();
-            chunkSizes.removeFirst();
-          }
-          pendingEventBuffer.discardOldestBytes(firstChunkSize);
-          pendingEventsReachedLimit = false;
-        }
+        discardOldestPendingEvents(bufferedBytes);
+        discarded = true;
 
         Logging.log(EventUploader.this, Severity.warning, Logging.tagLogBufferOverflow,
-            "Discarding an event batch of size " + firstChunkSize + " bytes, because we have been persistently unable to upload it. Latest error: ["
+            "Discarding an event batch of size " + bufferedBytes + " bytes, because we have been persistently unable to upload it. Latest error: ["
             + message + "]");
       }
     }
@@ -690,6 +684,7 @@ public class EventUploader {
       // to see whether the relay has come up cleanly.
       System.out.println("UPLOAD FAILURE: " + message);
     }
+    return discarded;
   }
 
   /**
