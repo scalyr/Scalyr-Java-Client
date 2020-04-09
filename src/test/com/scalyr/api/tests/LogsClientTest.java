@@ -42,6 +42,10 @@ import static org.junit.Assert.assertFalse;
  * Tests for the Logs client library (Events, EventUploader, etc.).
  */
 public class LogsClientTest extends LogsTestBase {
+  static final String SUCCESS  = "success";
+  static final String BACKOFF  = "error/server/backoff";
+  static final String DISABLED = "error/client/noPermission/accountDisabled";
+
   @Override @After public void teardown() {
     ScalyrUtil.removeCustomTime();
 
@@ -762,7 +766,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "three"));
     Events.info(new EventAttributes("tag", "four"));
 
-    expectSimpleUpload(threadId, threadName, false, "one", "two");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "one", "two");
 
     Events.flush();
 
@@ -778,7 +782,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "seven"));
     Events.info(new EventAttributes("tag", "eight"));
 
-    expectSimpleUpload(threadId, threadName, false, "five");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "five");
 
     Events.flush();
 
@@ -807,7 +811,7 @@ public class LogsClientTest extends LogsTestBase {
 
     String overflowMessageJson = buildOverflowMessageJson(threadId);
 
-    expectSimpleUpload(threadId, threadName, false, overflowMessageJson);
+    expectSimpleUpload(threadId, threadName, SUCCESS, overflowMessageJson);
     Events.flush();
     assertRequestQueueEmpty();
 
@@ -816,7 +820,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "four", "foo", largeString));
     Events.info(new EventAttributes("tag", "five"));
 
-    expectSimpleUpload(threadId, threadName, false, "three", overflowMessageJson);
+    expectSimpleUpload(threadId, threadName, SUCCESS, "three", overflowMessageJson);
     Events.flush();
     assertRequestQueueEmpty();
   }
@@ -853,7 +857,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "two", "foo", largeString));
     Span span = Events.startInfo(new EventAttributes("tag", "three"));
 
-    expectSimpleUpload(threadId, threadName, false, "one", buildOverflowMessageJson(threadId));
+    expectSimpleUpload(threadId, threadName, SUCCESS, "one", buildOverflowMessageJson(threadId));
     Events.flush();
     assertRequestQueueEmpty();
 
@@ -864,7 +868,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "six"));
     Events.info(new EventAttributes("tag", "seven"));
 
-    expectSimpleUpload(threadId, threadName, false, "four", "end:five", "six", "seven");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "four", "end:five", "six", "seven");
     Events.flush();
     assertRequestQueueEmpty();
   }
@@ -896,7 +900,7 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "two"));
     Events.end(span, new EventAttributes("tag", "three"));
 
-    expectSimpleUpload(threadId, threadName, false, largeString);
+    expectSimpleUpload(threadId, threadName, SUCCESS, largeString);
     Events.flush();
     assertRequestQueueEmpty();
   }
@@ -1028,8 +1032,8 @@ public class LogsClientTest extends LogsTestBase {
     Events.info(new EventAttributes("tag", "one"));
 
     // Have the server issue a failure response, and then a success response.
-    expectSimpleUpload(threadId, threadName, true, "one");
-    expectSimpleUpload(threadId, threadName, false, "one");
+    expectSimpleUpload(threadId, threadName, BACKOFF, "one");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "one");
 
     Events.flush();
     assertRequestQueueEmpty();
@@ -1039,6 +1043,11 @@ public class LogsClientTest extends LogsTestBase {
    * Verify that an event batch will be cleanly discarded after 20 minutes of failed upload attempts.
    */
   @Test public void testPersistentErrorHandling() {
+    testPersistentErrorHandling(false);
+    testPersistentErrorHandling(true);
+  }
+
+  private void testPersistentErrorHandling(boolean disabled) {
     // this test heisenbugs on jenkins; rather than chase it down we just skip it there
     Assume.assumeTrue(System.getenv("JENKINS_HOME") == null);
 
@@ -1055,7 +1064,7 @@ public class LogsClientTest extends LogsTestBase {
 
     // Let the client make an upload attempt; have it fail.
     ScalyrUtil.setCustomTimeNs(20 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, true, "one", "two");
+    expectSimpleUpload(threadId, threadName, BACKOFF, "one", "two");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
@@ -1065,29 +1074,29 @@ public class LogsClientTest extends LogsTestBase {
 
     // Let the client make several more upload attempts, all failing, over the space of 20 minutes.
     ScalyrUtil.setCustomTimeNs(350 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, true, "one", "two");
+    expectSimpleUpload(threadId, threadName, BACKOFF, "one", "two");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
     ScalyrUtil.setCustomTimeNs(650 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, true, "one", "two");
+    expectSimpleUpload(threadId, threadName, BACKOFF, "one", "two");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
     ScalyrUtil.setCustomTimeNs(950 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, true, "one", "two");
+    expectSimpleUpload(threadId, threadName, BACKOFF, "one", "two");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
     ScalyrUtil.setCustomTimeNs(1250 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, true, "one", "two");
+    expectSimpleUpload(threadId, threadName, disabled ? DISABLED : BACKOFF, "one", "two");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
     // That last failed attempt should have caused the client to discard the event batch. The next
     // upload attempt will involve the next batch; we'll allow it to succeed.
     ScalyrUtil.setCustomTimeNs(1260 * 1000000000L);
-    expectSimpleUpload(threadId, threadName, false, "three", "four");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "three", "four");
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
@@ -1124,7 +1133,7 @@ public class LogsClientTest extends LogsTestBase {
     assertRequestQueueEmpty();
 
     // 6.0 seconds later, the upload occurs. (Maybe sooner, depending on uploadSpacingFuzzFactor.)
-    expectSimpleUpload(threadId, threadName, false, "one");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "one");
     ScalyrUtil.advanceCustomTimeMs(2000);
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
@@ -1138,7 +1147,7 @@ public class LogsClientTest extends LogsTestBase {
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
-    expectSimpleUpload(threadId, threadName, false, "two", "three");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "two", "three");
     ScalyrUtil.advanceCustomTimeMs(500);
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
@@ -1150,7 +1159,7 @@ public class LogsClientTest extends LogsTestBase {
 
     double interval = 900;
     for (int i = 0; i < 20; i++) {
-      expectSimpleUpload(threadId, threadName, true, "four");
+      expectSimpleUpload(threadId, threadName, BACKOFF, "four");
       ScalyrUtil.advanceCustomTimeMs(100000);
       Events._uploadTimerTick(false);
       assertRequestQueueEmpty();
@@ -1167,7 +1176,7 @@ public class LogsClientTest extends LogsTestBase {
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
 
-    expectSimpleUpload(threadId, threadName, false, "four");
+    expectSimpleUpload(threadId, threadName, SUCCESS, "four");
     ScalyrUtil.advanceCustomTimeMs(2000);
     Events._uploadTimerTick(false);
     assertRequestQueueEmpty();
@@ -1605,7 +1614,7 @@ public class LogsClientTest extends LogsTestBase {
    * indicate a start or end event. Alternately, a "tag" that begins with an open-brace is
    * treated as a complete serialized event.
    */
-  private void expectSimpleUpload(long threadId, String threadName, boolean backoff, String ... tags) {
+  private void expectSimpleUpload(long threadId, String threadName, String status, String ... tags) {
     StringBuilder events = new StringBuilder();
     for (String tag : tags) {
       if (events.length() > 0)
@@ -1653,7 +1662,7 @@ public class LogsClientTest extends LogsTestBase {
         "  'id': '" + threadId + "'," +
         "  'name': '" + threadName + "'}]" +
         "}",
-        "{'status': '" + (backoff ? "error/server/backoff" : "success") + "'}"
+        "{'status': '" + status + "'}"
         );
   }
 }
