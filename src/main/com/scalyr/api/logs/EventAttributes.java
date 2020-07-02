@@ -26,7 +26,9 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+
 
 
 /**
@@ -38,6 +40,23 @@ import java.util.stream.Collectors;
  */
 public class EventAttributes {
   private final Map<String, Object> values = new HashMap<String, Object>();
+
+  /**
+   * A default (JVM-wide) transform to be applied to all `EventAttributes` instances.
+   *
+   * This function takes two arguments (a key and a corresponding string value) and returns
+   * a possibly-modified version of the value, with a transform applied.
+   *
+   * Ignored if {@link #transform} is non-null.
+   *
+   * Typically used to scrub possibly-sensitive string data prior to logging.
+   */
+  public static BiFunction<String, String, String> defaultTransform;
+
+  /**
+   * A per-instance override of {@link #defaultTransform}.
+   */
+  private BiFunction<String, String, String> transform;
 
   /**
    * Construct an empty attribute list.
@@ -170,6 +189,8 @@ public class EventAttributes {
       put(entry.getKey(), entry.getValue());
   }
 
+
+
   /**
    * Copy all attributes from the given object to this object. In case of conflicts,
    * attributes from objectToCopy overwrite the existing attributes in this object.
@@ -233,7 +254,7 @@ public class EventAttributes {
    */
   public EventAttributes put(String key, Object value) {
     synchronized (values) {
-      values.put(key, toValueType(value));
+      values.put(key, toValueType(key, value));
     }
     return this;
   }
@@ -241,7 +262,7 @@ public class EventAttributes {
   public EventAttributes putIfAbsent(String key, Object value) {
     synchronized (values) {
       if (!values.containsKey(key)) {
-        values.put(key, toValueType(value));
+        values.put(key, toValueType(key, value));
       }
     }
 
@@ -252,39 +273,40 @@ public class EventAttributes {
    * Return true if a value is stored for the specified attribute.
    */
   public boolean containsKey(String key) {
-
     synchronized (values) {
       return values.containsKey(key);
     }
   }
 
+  /** Setter for {@link #transform}, returns self for chaining. */
+  public EventAttributes setTransform(BiFunction<String, String, String> transform) {
+    this.transform = transform;
+    return this;
+  }
+
   /**
    * Convert the given value to one of the value types we can store in an event property.
    */
-  private static Object toValueType(Object value) {
-    if (value instanceof String)
-      return value;
-    else if (value instanceof Byte)
-      return (int)(Byte)value;
-    else if (value instanceof Short)
-      return (int)(Short)value;
-    else if (value instanceof Integer)
-      return value;
-    else if (value instanceof Long)
-      return value;
-    else if (value instanceof Float)
-      return value;
-    else if (value instanceof Double)
-      return value;
-    else if (value instanceof Boolean)
-      return value;
-    else if (value instanceof Date)
-      return ((Date) value).getTime();
-    else if (value == null)
-      return value;
-    else
-      return value.toString();
+  private Object toValueType(String key, Object value) {
+    if (value instanceof String)       return applyTransform(key, (String)value);
+    else if (value instanceof Byte)    return (int)(Byte)value;
+    else if (value instanceof Short)   return (int)(Short)value;
+    else if (value instanceof Integer) return value;
+    else if (value instanceof Long)    return value;
+    else if (value instanceof Float)   return value;
+    else if (value instanceof Double)  return value;
+    else if (value instanceof Boolean) return value;
+    else if (value instanceof Date)    return ((Date)value).getTime();
+    else if (value == null)            return value;
+    else                               return value.toString();
   }
+
+  private String applyTransform(String key, String value) {
+    return transform != null ? transform.apply(key, value)
+      : defaultTransform != null ? defaultTransform.apply(key, value)
+      : value;
+  }
+
 
   @Override public String toString() {
     // We return our attributes in alphabetical order, for consistency in tests.

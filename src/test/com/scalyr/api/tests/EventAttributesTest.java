@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * Tests for EventAttributes
@@ -16,6 +19,29 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class EventAttributesTest {
 
     private final int THREAD_START_WAIT_MS =500;
+
+
+    @Test
+    public void testTransforms() {
+      BiFunction<String, String, String> xform = (k, v) -> "a".equals(k) ? "0" : v;
+
+      assertEquals("0", new EventAttributes().setTransform(xform).put("a", "b").put("c", "d").get("a"));
+      assertEquals("d", new EventAttributes().setTransform(xform).put("a", "b").put("c", "d").get("c"));
+
+      try {
+        EventAttributes.defaultTransform = xform;
+        assertEquals("0", new EventAttributes().put("a", "b").put("c", "d").get("a"));
+        assertEquals("d", new EventAttributes().put("a", "b").put("c", "d").get("c"));
+
+        // per-instance transform overrides default transform
+        assertEquals("1", new EventAttributes().setTransform( (k,v) -> "1").put("a", "b").put("c", "d").get("a"));
+      } finally {
+        EventAttributes.defaultTransform = null;
+      }
+
+      assertEquals("b", new EventAttributes().put("a", "b").put("c", "d").get("a"));
+      assertEquals("d", new EventAttributes().put("a", "b").put("c", "d").get("c"));
+    }
 
     /**
      * Test concurrent modification support of EventAttributes by adding attributes to EventAttributes
