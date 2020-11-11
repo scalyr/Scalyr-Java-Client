@@ -70,10 +70,9 @@ public class TuningConstants {
    * Maximum payload size for a single invocation of LogService.uploadEvents.
    * This is the maximum size, in bytes, of the serialized events array.
    *
-   * Increasing this above 1MB may lead to problems where a single batch is larger
-   * than the burst size the server-side rate limiter allows.
+   * As of Nov 2020, the server-side batch size limit is 6MB.
    */
-  public static final int MAX_EVENT_UPLOAD_BYTES = 1024 * 1024;
+  public static final int MAX_EVENT_UPLOAD_BYTES = 5 * 1024 * 1024;
 
   /**
    * Payload size which triggers invocation of LogService.uploadEvents. We wait for
