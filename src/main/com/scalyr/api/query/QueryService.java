@@ -20,30 +20,54 @@ package com.scalyr.api.query;
 import com.scalyr.api.ScalyrException;
 import com.scalyr.api.ScalyrNetworkException;
 import com.scalyr.api.ScalyrServerException;
+import com.scalyr.api.internal.Logging;
 import com.scalyr.api.internal.ScalyrService;
+import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONArray;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.logs.EventAttributes;
 import com.scalyr.api.logs.Severity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 /**
  * Encapsulates the raw HTTP-level API to the log query service.
  */
 public class QueryService extends ScalyrService {
+
+  /** If nonzero, divide queries into chunks of at most this size for serial execution. */
+  private final int chunkSizeHours;
+
+
   /**
-   * Construct a QueryService.
+   * Construct a QueryService for non-chunked execution.
    *
    * @param apiToken The API authorization token to use when communicating with the server. Should
    *     be a "Read Logs" token.
    */
   public QueryService(String apiToken) {
-    super(apiToken);
+    this(apiToken, 0);
   }
+
+  /**
+   * Construct a QueryService.
+   *
+   * @param apiToken The API authorization token to use when communicating with the server. Should
+   *     be a "Read Logs" token.
+   * @param chunkSizeHours see {@link chunkSizeHours}
+   */
+  public QueryService(String apiToken, int chunkSizeHours) {
+    super(apiToken);
+    this.chunkSizeHours = chunkSizeHours;
+  }
+
 
   /**
    * Specifies which direction to page through the matching log events when more events match the
@@ -81,6 +105,23 @@ public class QueryService extends ScalyrService {
   public LogQueryResult logQuery(String filter, String startTime, String endTime, Integer maxCount,
                                  PageMode pageMode, String columns, String continuationToken)
       throws ScalyrException, ScalyrNetworkException {
+
+    if (chunkSizeHours <= 0)
+      return logQuery_(filter, startTime, endTime, maxCount, pageMode, columns, continuationToken);
+
+    Stream<Pair<String>> chunked = splitIntoChunks(startTime, endTime, chunkSizeHours);
+
+    if (pageMode == PageMode.head) chunked = reversed(chunked); // splitIntoChunks assumes `tail` mode, must flip for head
+
+    return chunked
+      .map(pair -> logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken))
+      .collect(Collectors.reducing(null, LogQueryResult::merge));
+    }
+
+  // Actual workhorse method for a single blocking query call
+  private LogQueryResult logQuery_(String filter, String startTime, String endTime, Integer maxCount,
+                                 PageMode pageMode, String columns, String continuationToken)
+      throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "log");
@@ -110,6 +151,78 @@ public class QueryService extends ScalyrService {
     checkResponseStatus(rawApiResponse);
     return unpackLogQueryResult(rawApiResponse);
   }
+
+
+  //--------------------------------------------------------------------------------
+  // query chunking, public for testing
+  //--------------------------------------------------------------------------------
+
+  public static <T> Stream<T> reversed(Stream<T> s) {
+    List<T> asList = s.collect(Collectors.toList());
+    Collections.reverse(asList);
+    return asList.stream();
+  }
+
+
+  public static class Pair<T> {
+    public final T a, b;
+    public Pair(T a, T b) {
+      this.a = a;
+      this.b = b;
+    }
+    @Override public boolean equals(Object o) {
+      if (!(o instanceof Pair))
+        return false;
+
+      Pair p = (Pair) o;
+      return ScalyrUtil.equals(a, p.a) && ScalyrUtil.equals(b, p.b);
+    }
+  }
+
+  private static final long Y2000 =  946684800L * ScalyrUtil.NANOS_PER_SECOND;
+  private static final long Y2100 = 4102444800L * ScalyrUtil.NANOS_PER_SECOND;
+
+  /**
+   * Split `[startTime, endTime)` into chunks of at most `chunkSizeHours`, if `chunkSizeHours` is greater than zero and start/end are
+   * both parseable as longs using nanosecond precision;  otherwise returns the input unchanged.
+   */
+  public static Stream<Pair<String>> splitIntoChunks(String startTime, String endTime, int chunkSizeHours) {
+    try {
+      long min = Long.parseLong(startTime);
+      long max = Long.parseLong(endTime);
+
+      if (min >= Y2000 && min < Y2100 && max >= Y2000 && max < Y2100)
+        return splitIntoChunks(min, max, chunkSizeHours).map(longPair -> new Pair<>(Long.toString(longPair.a), Long.toString(longPair.b)));
+
+    } catch (Exception ignored) {
+    }
+
+    Logging.log(Severity.warning, "local/warning/unchunkedQuery", "Could not split [" + startTime + ", " + endTime + ") into chunks, executing as-is");
+
+    return Stream.of(new Pair(startTime, endTime));
+  }
+
+  /** Split `[start, end)` into `[end-chunk, end), [end - chunk*2, end - chunk) ... [start, end - chunk*N)`. */
+  public static Stream<Pair<Long>> splitIntoChunks(final long start, final long end, final int chunkSizeHours) {
+    final long chunkNs = chunkSizeHours * 60 * 60 * ScalyrUtil.NANOS_PER_SECOND;
+    ArrayList<Pair<Long>> ret = new ArrayList<>();
+
+    for (int n = 0; n < 1000; n++) { // 1000 is just a short-circuit in case of weird input
+      long chunkEnd   = end - n*chunkNs;
+      long chunkStart = chunkEnd - chunkNs;
+      ret.add(new Pair(Math.max(start, chunkStart), chunkEnd));
+      if (chunkStart <= start)
+        return ret.stream();
+    }
+
+    Logging.log(Severity.warning, "local/warning/unchunkedQuery", "Too many chunks for [" + start + ", " + end + "); executing as-is");
+
+    return Stream.of(new Pair(start, end));
+  }
+
+
+
+
 
   /**
    * Given the raw server response to a log query, encapsulate the query result in a LogQueryResult.
@@ -481,6 +594,23 @@ public class QueryService extends ScalyrService {
       this.executionTime = executionTime;
       this.continuationToken = continuationToken;
     }
+
+
+    /**
+     * Merge `a` and `b` into a new result (whose `b` results follow those of `a`, and using b's continuationToken).
+     * Make sure to provide inputs in your desired order. May return its inputs if either is null.
+     */
+    static LogQueryResult merge(LogQueryResult a, LogQueryResult b) {
+      if (a == null) return b;
+      if (b == null) return a;
+      LogQueryResult ret = new LogQueryResult(a.executionTime + b.executionTime, b.continuationToken);
+      ret.matches.addAll(a.matches);
+      ret.matches.addAll(b.matches);
+      return ret;
+    }
+
+
+
 
     @Override public String toString() {
       int matchCount = matches.size();

@@ -20,13 +20,17 @@ package com.scalyr.api.tests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 
 import com.scalyr.api.ScalyrServerException;
 import com.scalyr.api.internal.ScalyrService;
+import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.query.QueryService;
 import com.scalyr.api.query.QueryService.*;
@@ -36,6 +40,49 @@ import com.scalyr.api.tests.MockServer.ExpectedRequest;
  * Tests for the Logs query client library.
  */
 public class QueryTest extends LogsTestBase {
+
+
+  @Test public void testChunking() {
+    assertEquals("b,a", QueryService.reversed(Stream.of("a", "b")).collect(Collectors.joining(",")));
+
+    final long base = 1609459200L * ScalyrUtil.NANOS_PER_SECOND; // 1/1/2021
+    final long hour = 60 * 60 * ScalyrUtil.NANOS_PER_SECOND;
+
+    // using strings
+    is(
+      Stream.of(new Pair(Long.toString(base - hour/2), Long.toString(base))),
+      QueryService.splitIntoChunks(Long.toString(base - hour/2), Long.toString(base), 1)
+    );
+
+    // using longs
+    is(
+      Stream.of(new Pair(base - hour/2, base)),
+      QueryService.splitIntoChunks(base - hour/2, base, 1)
+    );
+    is(
+      Stream.of(new Pair(base - hour, base), new Pair(base - (3*hour/2), base-hour)),
+      QueryService.splitIntoChunks(base - (3*hour/2), base, 1)
+    );
+    is(
+      Stream.of(new Pair(base - 2*hour, base), new Pair(base - (5*hour/2), base- 2*hour)),
+      QueryService.splitIntoChunks(base - (5*hour/2), base, 2)
+    );
+
+    // various unchunked cases
+    is(new Pair("foo", "bar"), QueryService.splitIntoChunks("foo", "bar", 1));         // strings not long-valued
+    is(new Pair("100", "2000000"), QueryService.splitIntoChunks("100", "2000000", 1)); // long values not in proper range
+  }
+  private <T> void is(Stream<T> a, Stream<T> b) {
+    List<T> aList = a.collect(Collectors.toList());
+    List<T> bList = b.collect(Collectors.toList());
+    assertEquals(aList.size(), bList.size());
+    for (int i=0; i<aList.size(); i++) assertEquals(aList.get(i), bList.get(i));
+  }
+  private <T> void is(T a, Stream<T> b) {
+    is(Stream.of(a), b);
+  }
+
+
   /**
    * A simple test of QueryService.logQuery(), issuing a query and verifying that the response is
    * correctly unpacked.
