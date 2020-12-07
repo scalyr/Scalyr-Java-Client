@@ -129,7 +129,7 @@ public class QueryService extends ScalyrService {
       Pair<String> pair = chunkList.get(i);
       LogQueryResult chunk = logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken);
       merged = LogQueryResult.merge(merged, chunk);
-      if (merged.continuationToken != null) break;
+      if (merged.matches.size() >= maxCount) break;
     }
 
     return merged;
