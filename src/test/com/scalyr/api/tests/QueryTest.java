@@ -45,9 +45,17 @@ public class QueryTest extends LogsTestBase {
   @Test public void testChunking() {
     assertEquals("b,a", QueryService.reversed(Stream.of("a", "b")).collect(Collectors.joining(",")));
 
-    final long base = 1609459200L * ScalyrUtil.NANOS_PER_SECOND; // 1/1/2021
-    final long hour = 60 * 60 * ScalyrUtil.NANOS_PER_SECOND;
+    // negative tests
+    try { QueryService.splitIntoChunks("foo", "bar", 1);     fail("unparseable strings");             } catch (Exception expected) { }
 
+    // positive tests using our 3 supported resolutions (seconds-, millis-, or nanos-since-1970)
+    final long base = 1609459200L; // 1/1/2021 in epoch seconds
+    final long hour = 60 * 60;
+    testChunking(base                              , hour);
+    testChunking(base * 1000                       , hour * 1000);
+    testChunking(base * ScalyrUtil.NANOS_PER_SECOND, hour * ScalyrUtil.NANOS_PER_SECOND);
+  }
+  void testChunking(final long base, final long hour) {
     // using strings
     is(
       Stream.of(new Pair(Long.toString(base), Long.toString(base + hour/2))),
@@ -67,10 +75,6 @@ public class QueryTest extends LogsTestBase {
       Stream.of(new Pair(base, base + 2*hour), new Pair(base + 2*hour, base + (5*hour/2))),
       QueryService.splitIntoChunks(base, base + (5*hour/2), 2)
     );
-
-    // various unchunked cases
-    try { QueryService.splitIntoChunks("foo", "bar", 1);     fail("unparseable strings");             } catch (Exception expected) { }
-    try { QueryService.splitIntoChunks("100", "2000000", 1); fail("long values not in proper range"); } catch (Exception expected) { }
   }
   private <T> void is(Stream<T> a, Stream<T> b) {
     List<T> aList = a.collect(Collectors.toList());

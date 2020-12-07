@@ -182,34 +182,35 @@ public class QueryService extends ScalyrService {
     }
   }
 
-  private static final long Y2000 =  946684800L * ScalyrUtil.NANOS_PER_SECOND;
-  private static final long Y2100 = 4102444800L * ScalyrUtil.NANOS_PER_SECOND;
-
   /**
-   * Split `[startTime, endTime)` into chunks of at most `chunkSizeHours`, if `chunkSizeHours` is greater than zero and start/end are
-   * both parseable as longs using nanosecond precision;  otherwise returns the input unchanged.
+   * Split `[startTime, endTime)` into chunks of at most `chunkSizeHours`.
+   *
+   * @throws RuntimeException unless both startTime and endTime can be parsed as seconds-, millis-, or nanos-since-1970.
    */
   public static Stream<Pair<String>> splitIntoChunks(String startTime, String endTime, int chunkSizeHours) {
     try {
-      long min = Long.parseLong(startTime);
-      long max = Long.parseLong(endTime);
-
-      if (min >= Y2000 && min < Y2100 && max >= Y2000 && max < Y2100)
-        return splitIntoChunks(min, max, chunkSizeHours).map(longPair -> new Pair<>(Long.toString(longPair.a), Long.toString(longPair.b)));
+      return splitIntoChunks(Long.parseLong(startTime), Long.parseLong(endTime), chunkSizeHours)
+        .map(longPair -> new Pair<>(Long.toString(longPair.a), Long.toString(longPair.b)));
     } catch (Exception ignored) {
     }
 
-    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + ") as nanos-since-1970; only dates in the range 1/1/2000 - 1/1/2100 are supported");
+    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must be epoch seconds");
   }
 
   /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
   public static Stream<Pair<Long>> splitIntoChunks(final long start, final long end, final int chunkSizeHours) {
-    final long chunkNs = chunkSizeHours * 60 * 60 * ScalyrUtil.NANOS_PER_SECOND;
+    // figure out the right chunkSize to use per `chunkSizeHours` vs our supported start/end precisions
+    // using 1/1/2470 as the cutoff for detecting the precision used by "end"
+    final long chunkSize =
+      end < 500L*365*24*60*60       ? chunkSizeHours*3600L :       // seconds
+      end < 500L*365*24*60*60*1_000 ? chunkSizeHours*3600L*1_000 : // millis
+      chunkSizeHours*3600L*ScalyrUtil.NANOS_PER_SECOND;               // everything else nanos
+
     ArrayList<Pair<Long>> ret = new ArrayList<>();
 
     for (int n = 0; n < 1000; n++) { // 1000 is just a short-circuit in case of weird input
-      long chunkStart  = start + n*chunkNs;
-      long chunkEnd = chunkStart + chunkNs;
+      long chunkStart = start + n*chunkSize;
+      long chunkEnd   = chunkStart + chunkSize;
       ret.add(new Pair(chunkStart, Math.min(end, chunkEnd)));
       if (chunkEnd >= end)
         return ret.stream();
