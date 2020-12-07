@@ -18,8 +18,10 @@
 package com.scalyr.api.tests;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,6 +34,7 @@ import com.scalyr.api.ScalyrServerException;
 import com.scalyr.api.internal.ScalyrService;
 import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONObject;
+import com.scalyr.api.logs.Severity;
 import com.scalyr.api.query.QueryService;
 import com.scalyr.api.query.QueryService.*;
 import com.scalyr.api.tests.MockServer.ExpectedRequest;
@@ -46,7 +49,7 @@ public class QueryTest extends LogsTestBase {
     assertEquals("b,a", QueryService.reversed(Stream.of("a", "b")).collect(Collectors.joining(",")));
 
     // negative tests
-    try { QueryService.splitIntoChunks("foo", "bar", 1);     fail("unparseable strings");             } catch (Exception expected) { }
+    try { QueryService.splitIntoChunks("foo", "bar", 1); fail("unparseable strings"); } catch (Exception expected) { }
 
     // positive tests using our 3 supported resolutions (seconds-, millis-, or nanos-since-1970)
     final long base = 1609459200L; // 1/1/2021 in epoch seconds
@@ -84,6 +87,33 @@ public class QueryTest extends LogsTestBase {
   }
   private <T> void is(T a, Stream<T> b) {
     is(Stream.of(a), b);
+  }
+
+  @Test public void testNumericMerging() {
+    NumericQueryResult merged = Stream.of(null, NQR(100.0, 0.0, 1.0, 2.0), NQR(50.0, 3.0))
+      .collect(Collectors.reducing(null, NumericQueryResult::merge));
+
+    assertTrue(merged.executionTime == 150.0);
+    assertEquals(merged.values.size(), 4);
+    for (int i=0; i<merged.values.size(); i++) assertTrue(merged.values.get(i).doubleValue() == (double)i);
+  }
+  @Test public void testLogMerging() {
+    LogQueryResult merged = Stream.of(null, LQR(100.0, 0, 1, 2), LQR(50.0, 3))
+      .collect(Collectors.reducing(null, LogQueryResult::merge));
+
+    assertTrue(merged.executionTime == 150.0);
+    assertEquals(merged.matches.size(), 4);
+    for (int i=0; i<merged.matches.size(); i++) assertTrue(merged.matches.get(i).timestamp == (long)i);
+  }
+  NumericQueryResult NQR(double execTime, double... values) {
+    NumericQueryResult ret = new NumericQueryResult(execTime);
+    for (int i=0; i<values.length; i++) ret.values.add(values[i]);
+    return ret;
+  }
+  LogQueryResult LQR(double execTime, long... timestamps) {
+    LogQueryResult ret = new LogQueryResult(execTime, null);
+    for (int i=0; i<timestamps.length; i++) ret.matches.add(new LogQueryMatch(timestamps[i], null, Severity.info, null, null, null, null));
+    return ret;
   }
 
 

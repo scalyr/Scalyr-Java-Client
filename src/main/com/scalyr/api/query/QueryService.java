@@ -61,7 +61,17 @@ public class QueryService extends ScalyrService {
    *
    * @param apiToken The API authorization token to use when communicating with the server. Should
    *     be a "Read Logs" token.
-   * @param chunkSizeHours see {@link chunkSizeHours}
+   * @param chunkSizeHours If nonzero, then for queries which cover a long time period, we split the query
+   *     into chunks of this duration and issue each chunk as a separate query. For instance, if `chunkSizeHours`
+   *     is 24 and you query a 7-day period, we issue seven separate one-day queries. These queries are issued
+   *     one at a time. Chunking should be used if you experience timeouts when querying long time periods, which
+   *     can happen if you have a large amount of log data, especially when using full-text search rather than
+   *     querying specific fields. (For instance, `userName == 'foo'` will execute more efficiently than `message contains 'foo'`.)
+   *
+   *     A reasonable chunk size is often 12 to 24 hours. Smaller values reduce the possibility of timeout, but add
+   *     overhead for extra round-trips to the Scalyr server.
+   *
+   *    chunkSizeHours is only supported for a limit set of query types; others will thrown a RuntimeException.
    */
   public QueryService(String apiToken, int chunkSizeHours) {
     super(apiToken);
@@ -606,7 +616,7 @@ public class QueryService extends ScalyrService {
      */
     public final String continuationToken;
 
-    LogQueryResult(double executionTime, String continuationToken) {
+    public LogQueryResult(double executionTime, String continuationToken) {
       this.executionTime = executionTime;
       this.continuationToken = continuationToken;
     }
@@ -616,7 +626,7 @@ public class QueryService extends ScalyrService {
      * Merge `a` and `b` into a new result (whose `b` matches follow those of `a`, and using b's continuationToken).
      * Make sure to provide inputs in your desired order. May return one of its inputs if the other is null.
      */
-    static LogQueryResult merge(LogQueryResult a, LogQueryResult b) {
+    public static LogQueryResult merge(LogQueryResult a, LogQueryResult b) {
       if (a == null) return b;
       if (b == null) return a;
       LogQueryResult ret = new LogQueryResult(a.executionTime + b.executionTime, b.continuationToken);
@@ -687,7 +697,7 @@ public class QueryService extends ScalyrService {
      */
     public final EventAttributes fields;
 
-    LogQueryMatch(long timestamp, String message, Severity severity, String sessionId, EventAttributes sessionFields,
+    public LogQueryMatch(long timestamp, String message, Severity severity, String sessionId, EventAttributes sessionFields,
                   String threadId, EventAttributes fields) {
       this.timestamp = timestamp;
       this.message = message;
@@ -721,7 +731,7 @@ public class QueryService extends ScalyrService {
      */
     public final double executionTime;
 
-    NumericQueryResult(double executionTime) {
+    public NumericQueryResult(double executionTime) {
       this.executionTime = executionTime;
     }
 
@@ -729,7 +739,7 @@ public class QueryService extends ScalyrService {
      * Merge `a` and `b` into a new result (whose `b` values follow those of `a`)
      * Make sure to provide inputs in your desired order. May return one of its inputs if the other is null.
      */
-    static NumericQueryResult merge(NumericQueryResult a, NumericQueryResult b) {
+    public static NumericQueryResult merge(NumericQueryResult a, NumericQueryResult b) {
       if (a == null) return b;
       if (b == null) return a;
       NumericQueryResult ret = new NumericQueryResult(a.executionTime + b.executionTime);
