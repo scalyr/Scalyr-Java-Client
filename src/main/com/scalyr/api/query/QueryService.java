@@ -297,6 +297,12 @@ public class QueryService extends ScalyrService {
    * system, or other automated tool. A timeseries precomputes a numeric query, allowing you to execute queries almost
    * instantaneously, and without exhausting your query execution limit.
    *
+   * NOTE - if you are using chunked queries, each chunk will be queried using `buckets` - so, the total number of
+   * buckets returned will be the `buckets * (endTime-startTime)/chunkSize`.  As a result, you should take care
+   * that your query timespan (`endTime-startTime`) is a multiple of your chunkSize.  If this is not the case,
+   * then the final chunk will cover less time than the earlier chunks, and the buckets will likewise cover
+   * less time, which will be misleading.
+   *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
    * @param function Specifies the value to compute from the matching events. You can use any function listed
