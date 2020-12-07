@@ -397,6 +397,10 @@ public class QueryService extends ScalyrService {
    */
   public FacetQueryResult facetQuery(String filter, String field, Integer maxCount, String startTime, String endTime)
       throws ScalyrException, ScalyrNetworkException {
+
+    if (chunkSizeHours > 0)
+      throw new RuntimeException("chunked facet queries not yet supported; use a non-chunking QueryService for facet queries");
+
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "facet");
@@ -466,6 +470,10 @@ public class QueryService extends ScalyrService {
    */
   public TimeseriesQueryResult timeseriesQuery(TimeseriesQuerySpec[] queries)
       throws ScalyrException, ScalyrNetworkException {
+
+    if (chunkSizeHours > 0)
+      throw new RuntimeException("chunked timeseries queries not yet supported; use a non-chunking QueryService for timeseries queries");
+
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
 
