@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -113,8 +113,11 @@ public class QueryService extends ScalyrService {
 
     if (pageMode == PageMode.head) chunked = reversed(chunked); // splitIntoChunks assumes `tail` mode, must flip for head
 
+    AtomicBoolean stop = new AtomicBoolean(false);
     return chunked
+      .filter(pair -> !stop.get())
       .map(pair -> logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken))
+      .peek(result -> stop.getAndSet(result.continuationToken != null)) // stream abuse!
       .collect(Collectors.reducing(null, LogQueryResult::merge));
     }
 
