@@ -208,7 +208,7 @@ public class QueryService extends ScalyrService {
     } catch (Exception ignored) {
     }
 
-    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must be epoch seconds");
+    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must be seconds-, millis-, or nanos-since-1970");
   }
 
   /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
