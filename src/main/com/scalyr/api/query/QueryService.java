@@ -870,4 +870,83 @@ public class QueryService extends ScalyrService {
     }
   }
 
+
+  /**
+   * Quick, hacky cmd line interface; first arg is the name of the query method and
+   * subsequent args are 1-for-1 positional parameters for that method.  Provide '-' for
+   * optional parameters you wish to omit.
+   */
+  public static void main(String[] args) {
+    final String apiToken = System.getenv("scalyr_readlog_token");
+    final String chunkSizeHours = System.getenv("scalyr_chunksize_hours");
+
+    if (apiToken == null)
+      printUsageAndExit("ERROR: must specify 'scalyr_readlog_token'");
+
+    if (args.length < 1 || args[0] == null || args[0].matches("--?(\\?|help)"))
+      printUsageAndExit();
+
+    String method = args[0];
+    if (method == null || !method.matches("^(facet|numeric|log)Query$"))
+      printUsageAndExit("ERROR: unrecognized method '" + method + "'");
+
+    try {
+      QueryService svc = new QueryService(apiToken, chunkSizeHours == null ? 0 : Integer.parseInt(chunkSizeHours));
+
+      // 'parse' args, so hacky
+      String filter = null, function = null, field = null, startTime = null, endTime = null, columns = null, continuationToken = null;
+      PageMode pageMode = PageMode.head;
+      Integer maxCount = null, buckets = null;
+
+      int i    = 1;
+      filter   = args[i++];
+      if (method.equals("numericQuery")) function = args[i++];
+      if (method.equals("facetQuery"))   field    = args[i++];
+      if (method.equals("facetQuery"))   maxCount = Integer.parseInt(args[i++]); // awesome that this comes before start/end time for facetQuery
+      startTime = args[i++];
+      endTime   = args[i++];
+      if (method.equals("numericQuery")) buckets  = Integer.parseInt(args[i++]);
+      if (method.equals("logQuery"))     maxCount = Integer.parseInt(args[i++]);
+      if (method.equals("logQuery"))     pageMode = Enum.valueOf(PageMode.class, args[i++]);
+      if (method.equals("logQuery") && args.length > i) columns = args[i++];
+      if (method.equals("logQuery") && args.length > i) continuationToken = args[i++];
+
+      if ("-".equals(filter))            filter              = null;
+      if ("-".equals(function))          function            = null;
+      if ("-".equals(field))             field               = null;
+      if ("-".equals(startTime))         startTime           = null;
+      if ("-".equals(endTime))           endTime             = null;
+      if ("-".equals(columns))           columns             = null;
+      if ("-".equals(continuationToken)) continuationToken   = null;
+
+      if (method.equals("logQuery"))     dump(    svc.logQuery(filter, startTime, endTime, maxCount, pageMode, columns, continuationToken));
+      if (method.equals("facetQuery"))   dump(  svc.facetQuery(filter, field, maxCount, startTime, endTime));
+      if (method.equals("numericQuery")) dump(svc.numericQuery(filter, function, startTime, endTime, buckets));
+    } catch (Exception e) {
+      printUsageAndExit(e.getMessage());
+    }
+  }
+
+  // TODO: make these prettier
+  static void dump(LogQueryResult r)     { System.out.println(r.toString()); }
+  static void dump(FacetQueryResult r)   { System.out.println(r.toString()); }
+  static void dump(NumericQueryResult r) { System.out.println(r.toString()); }
+
+  static void printUsageAndExit(String err) {
+    System.err.println(err);
+    System.err.println("");
+    printUsageAndExit();
+  }
+
+  static void printUsageAndExit() {
+    System.err.println("Usage: java com.scalyr.api.query.QueryService <methodName> <methodArg1> <methodArg2>...");
+    System.err.println("       First arg is the name of the query method and subsequent args are 1-for-1 positional");
+    System.err.println("       parameters for that method.  Provide '-' for optional parameters you wish to omit");
+    System.err.println("");
+    System.err.println("   eg: ..QueryService logQuery someText 4h 0m 100 tail - -");
+    System.err.println("");
+    System.err.println("Quitting");
+    System.exit(1);
+  }
+
 }
