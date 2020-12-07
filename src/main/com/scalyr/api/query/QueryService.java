@@ -308,6 +308,23 @@ public class QueryService extends ScalyrService {
   public NumericQueryResult numericQuery(String filter, String function, String startTime,
                                          String endTime, Integer buckets)
       throws ScalyrException, ScalyrNetworkException {
+
+    if (chunkSizeHours <= 0)
+      return numericQuery_(filter, function, startTime, endTime, buckets);
+
+    Stream<Pair<String>> chunked = splitIntoChunks(startTime, endTime, chunkSizeHours);
+
+    return chunked
+      .map(pair -> numericQuery_(filter, function, pair.a, pair.b, buckets))
+      .collect(Collectors.reducing(null, NumericQueryResult::merge));
+    }
+
+
+
+  // actual workhorse of for one blocking query call
+  private NumericQueryResult numericQuery_(String filter, String function, String startTime,
+                                         String endTime, Integer buckets)
+      throws ScalyrException, ScalyrNetworkException {
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "numeric");
@@ -600,8 +617,8 @@ public class QueryService extends ScalyrService {
 
 
     /**
-     * Merge `a` and `b` into a new result (whose `b` results follow those of `a`, and using b's continuationToken).
-     * Make sure to provide inputs in your desired order. May return its inputs if either is null.
+     * Merge `a` and `b` into a new result (whose `b` matches follow those of `a`, and using b's continuationToken).
+     * Make sure to provide inputs in your desired order. May return one of its inputs if the other is null.
      */
     static LogQueryResult merge(LogQueryResult a, LogQueryResult b) {
       if (a == null) return b;
@@ -711,6 +728,20 @@ public class QueryService extends ScalyrService {
     NumericQueryResult(double executionTime) {
       this.executionTime = executionTime;
     }
+
+    /**
+     * Merge `a` and `b` into a new result (whose `b` values follow those of `a`)
+     * Make sure to provide inputs in your desired order. May return one of its inputs if the other is null.
+     */
+    static NumericQueryResult merge(NumericQueryResult a, NumericQueryResult b) {
+      if (a == null) return b;
+      if (b == null) return a;
+      NumericQueryResult ret = new NumericQueryResult(a.executionTime + b.executionTime);
+      ret.values.addAll(a.values);
+      ret.values.addAll(b.values);
+      return ret;
+    }
+
 
     @Override public String toString() {
       int valueCount = values.size();
