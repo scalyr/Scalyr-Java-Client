@@ -208,7 +208,7 @@ public class QueryService extends ScalyrService {
     } catch (Exception ignored) {
     }
 
-    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must be seconds-, millis-, or nanos-since-1970");
+    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must numeric (in seconds-, millis-, or nanos-since-1970) when using a chunking QueryService");
   }
 
   /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
@@ -302,6 +302,12 @@ public class QueryService extends ScalyrService {
    * that your query timespan (`endTime-startTime`) is a multiple of your chunkSize.  If this is not the case,
    * then the final chunk will cover less time than the earlier chunks, and the buckets will likewise cover
    * less time, which will be misleading.
+   *
+   * In any case, when using a chunking QueryService, you will need to sum (or otherwise combine) the results from the
+   * individual chunk queries. For a simple example, if chunkSizeHours is 24, you are querying a 7 day span, and you
+   * specify `function='count'` and `buckets=1`, the result will contain seven values – giving the number of matching events
+   * in each day of the query.  You would then sum those values to compute the total number of matching events across
+   * the 7 day span.
    *
    * @param filter Specifies which log records to match, using the same syntax as the Expression field in the
    *     query UI. To match all log records, pass null or an empty string.
