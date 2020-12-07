@@ -69,8 +69,8 @@ public class QueryTest extends LogsTestBase {
     );
 
     // various unchunked cases
-    is(new Pair("foo", "bar"), QueryService.splitIntoChunks("foo", "bar", 1));         // strings not long-valued
-    is(new Pair("100", "2000000"), QueryService.splitIntoChunks("100", "2000000", 1)); // long values not in proper range
+    try { QueryService.splitIntoChunks("foo", "bar", 1);     fail("unparseable strings");             } catch (Exception expected) { }
+    try { QueryService.splitIntoChunks("100", "2000000", 1); fail("long values not in proper range"); } catch (Exception expected) { }
   }
   private <T> void is(Stream<T> a, Stream<T> b) {
     List<T> aList = a.collect(Collectors.toList());

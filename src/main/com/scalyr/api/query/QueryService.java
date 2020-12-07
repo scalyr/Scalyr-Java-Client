@@ -196,13 +196,10 @@ public class QueryService extends ScalyrService {
 
       if (min >= Y2000 && min < Y2100 && max >= Y2000 && max < Y2100)
         return splitIntoChunks(min, max, chunkSizeHours).map(longPair -> new Pair<>(Long.toString(longPair.a), Long.toString(longPair.b)));
-
     } catch (Exception ignored) {
     }
 
-    Logging.log(Severity.warning, "local/warning/unchunkedQuery", "Could not split [" + startTime + ", " + endTime + ") into chunks, executing as-is");
-
-    return Stream.of(new Pair(startTime, endTime));
+    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + ") as nanos-since-1970; only dates in the range 1/1/2000 - 1/1/2100 are supported");
   }
 
   /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
@@ -218,9 +215,7 @@ public class QueryService extends ScalyrService {
         return ret.stream();
     }
 
-    Logging.log(Severity.warning, "local/warning/unchunkedQuery", "Too many chunks for [" + start + ", " + end + "); executing as-is");
-
-    return Stream.of(new Pair(start, end));
+    throw new RuntimeException("Too many chunks for [" + start + ", " + end + ")");
   }
 
 
