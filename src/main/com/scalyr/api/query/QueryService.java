@@ -111,7 +111,7 @@ public class QueryService extends ScalyrService {
 
     Stream<Pair<String>> chunked = splitIntoChunks(startTime, endTime, chunkSizeHours);
 
-    if (pageMode == PageMode.head) chunked = reversed(chunked); // splitIntoChunks assumes `tail` mode, must flip for head
+    if (pageMode == PageMode.tail) chunked = reversed(chunked); // splitIntoChunks returns oldest -> newest, must flip for tail
 
     AtomicBoolean stop = new AtomicBoolean(false);
     return chunked
@@ -205,16 +205,16 @@ public class QueryService extends ScalyrService {
     return Stream.of(new Pair(startTime, endTime));
   }
 
-  /** Split `[start, end)` into `[end-chunk, end), [end - chunk*2, end - chunk) ... [start, end - chunk*N)`. */
+  /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
   public static Stream<Pair<Long>> splitIntoChunks(final long start, final long end, final int chunkSizeHours) {
     final long chunkNs = chunkSizeHours * 60 * 60 * ScalyrUtil.NANOS_PER_SECOND;
     ArrayList<Pair<Long>> ret = new ArrayList<>();
 
     for (int n = 0; n < 1000; n++) { // 1000 is just a short-circuit in case of weird input
-      long chunkEnd   = end - n*chunkNs;
-      long chunkStart = chunkEnd - chunkNs;
-      ret.add(new Pair(Math.max(start, chunkStart), chunkEnd));
-      if (chunkStart <= start)
+      long chunkStart  = start + n*chunkNs;
+      long chunkEnd = chunkStart + chunkNs;
+      ret.add(new Pair(chunkStart, Math.min(end, chunkEnd)));
+      if (chunkEnd >= end)
         return ret.stream();
     }
 

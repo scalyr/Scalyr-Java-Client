@@ -50,22 +50,22 @@ public class QueryTest extends LogsTestBase {
 
     // using strings
     is(
-      Stream.of(new Pair(Long.toString(base - hour/2), Long.toString(base))),
-      QueryService.splitIntoChunks(Long.toString(base - hour/2), Long.toString(base), 1)
+      Stream.of(new Pair(Long.toString(base), Long.toString(base + hour/2))),
+      QueryService.splitIntoChunks(Long.toString(base), Long.toString(base + hour/2), 1)
     );
 
     // using longs
     is(
-      Stream.of(new Pair(base - hour/2, base)),
-      QueryService.splitIntoChunks(base - hour/2, base, 1)
+      Stream.of(new Pair(base, base + hour/2)),
+      QueryService.splitIntoChunks(base, base + hour/2, 1)
     );
     is(
-      Stream.of(new Pair(base - hour, base), new Pair(base - (3*hour/2), base-hour)),
-      QueryService.splitIntoChunks(base - (3*hour/2), base, 1)
+      Stream.of(new Pair(base, base + hour), new Pair(base + hour, base + (3*hour/2))),
+      QueryService.splitIntoChunks(base, base + (3*hour/2), 1)
     );
     is(
-      Stream.of(new Pair(base - 2*hour, base), new Pair(base - (5*hour/2), base- 2*hour)),
-      QueryService.splitIntoChunks(base - (5*hour/2), base, 2)
+      Stream.of(new Pair(base, base + 2*hour), new Pair(base + 2*hour, base + (5*hour/2))),
+      QueryService.splitIntoChunks(base, base + (5*hour/2), 2)
     );
 
     // various unchunked cases
