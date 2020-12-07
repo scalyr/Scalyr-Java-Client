@@ -123,13 +123,17 @@ public class QueryService extends ScalyrService {
 
     if (pageMode == PageMode.tail) chunked = reversed(chunked); // splitIntoChunks returns oldest -> newest, must flip for tail
 
-    AtomicBoolean stop = new AtomicBoolean(false);
-    return chunked
-      .filter(pair -> !stop.get())
-      .map(pair -> logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken))
-      .peek(result -> stop.getAndSet(result.continuationToken != null)) // stream abuse!
-      .collect(Collectors.reducing(null, LogQueryResult::merge));
+    LogQueryResult merged = null;
+    List<Pair<String>> chunkList = chunked.collect(Collectors.toList());
+    for (int i=0; i<chunkList.size(); i++) {
+      Pair<String> pair = chunkList.get(i);
+      LogQueryResult chunk = logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken);
+      merged = LogQueryResult.merge(merged, chunk);
+      if (merged.continuationToken != null) break;
     }
+
+    return merged;
+  }
 
   // Actual workhorse method for a single blocking query call
   private LogQueryResult logQuery_(String filter, String startTime, String endTime, Integer maxCount,
