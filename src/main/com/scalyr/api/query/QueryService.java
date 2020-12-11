@@ -70,17 +70,17 @@ public class QueryService extends ScalyrService {
    *     overhead for extra round-trips to the Scalyr server.
    *
    *     chunkSizeHours is only supported for a limit set of query types; others will throw a RuntimeException.
-   * @param maxParallelThreads Only applicable when chunkSizeHours is used. If greater than 1, then we will run this
+   * @param maxQueryThreads Only applicable when chunkSizeHours is used. If greater than 1, then we will run this
    *     many queries in parallel. This should only be used when querying extremely large datasets; generally consult
    *     with Scalyr support before specifying a nonzero value for this parameter. In any case, this parameter should
    *     never be more than about 3. Note that if you issue multiple simultaneous queries, they will share the
    *     threadpool.
    */
-  public QueryService(String apiToken, int chunkSizeHours, int maxParallelThreads) {
+  public QueryService(String apiToken, int chunkSizeHours, int maxQueryThreads) {
     super(apiToken);
     this.chunkSizeHours = chunkSizeHours;
-    if (maxParallelThreads > 1) {
-      this.queryThreadpool = Executors.newFixedThreadPool(maxParallelThreads, r -> {
+    if (maxQueryThreads > 1) {
+      this.queryThreadpool = Executors.newFixedThreadPool(maxQueryThreads, r -> {
         Thread thread = new Thread(r);
         thread.setDaemon(true);
         return thread;
@@ -90,7 +90,7 @@ public class QueryService extends ScalyrService {
   }
 
   /**
-   * Shut down the threadpool used to parallelize query execution. Only needed if you supplied maxParallelThreads > 1
+   * Shut down the threadpool used to parallelize query execution. Only needed if you supplied maxQueryThreads > 1
    * when constructing this QueryService instance.
    */
   public void shutdown() {
@@ -395,7 +395,6 @@ public class QueryService extends ScalyrService {
    * parallel, using queryThreadpool.
    */
   private NumericQueryResult parallelNumericQuery(String filter, String function, Integer buckets, Stream<Pair<String>> chunkList) {
-    // !!! test
     List<Future<NumericQueryResult>> futures = new ArrayList<>();
     chunkList.forEach(chunk -> futures.add(queryThreadpool.submit(() -> numericQuery_(filter, function, chunk.a, chunk.b, buckets))));
 
@@ -409,6 +408,9 @@ public class QueryService extends ScalyrService {
   private NumericQueryResult numericQuery_(String filter, String function, String startTime,
                                          String endTime, Integer buckets)
       throws ScalyrException, ScalyrNetworkException {
+    long launchTime = System.currentTimeMillis();
+    debugLog("Launching query for [" + startTime + "..." + endTime + "]");
+
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "numeric");
@@ -430,6 +432,7 @@ public class QueryService extends ScalyrService {
 
     JSONObject rawApiResponse = invokeApi("api/numericQuery", parameters);
     checkResponseStatus(rawApiResponse);
+    debugLog("Finishing query for [" + startTime + "..." + endTime + "] after " + (System.currentTimeMillis() - launchTime) + " ms");
     return unpackNumericQueryResult(rawApiResponse);
   }
 
@@ -993,6 +996,8 @@ public class QueryService extends ScalyrService {
 
     final String apiToken = System.getenv("scalyr_readlog_token");
     final String chunkSizeHours = System.getenv("scalyr_chunksize_hours");
+    final String maxQueryThreads = System.getenv("scalyr_query_threads");
+    final String serverAddress = System.getenv("scalyr_server_address");
 
     if (apiToken == null)
       printUsageAndExit("ERROR: must specify 'scalyr_readlog_token'");
@@ -1005,7 +1010,11 @@ public class QueryService extends ScalyrService {
       printUsageAndExit("ERROR: unrecognized method '" + method + "'");
 
     try {
-      QueryService svc = new QueryService(apiToken, chunkSizeHours == null ? 0 : Integer.parseInt(chunkSizeHours), 3/*!!!*/);
+      QueryService svc = new QueryService(apiToken,
+        chunkSizeHours == null ? 0 : Integer.parseInt(chunkSizeHours),
+        maxQueryThreads != null ? Integer.parseInt(maxQueryThreads) : 0);
+      if (serverAddress != null && serverAddress.length() > 0)
+        svc.setServerAddress(serverAddress);
 
       // 'parse' args, so hacky
       String filter = null, function = null, field = null, startTime = null, endTime = null, columns = null, continuationToken = null;
