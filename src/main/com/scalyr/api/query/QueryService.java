@@ -72,8 +72,8 @@ public class QueryService extends ScalyrService {
    *     chunkSizeHours is only supported for a limit set of query types; others will throw a RuntimeException.
    * @param maxQueryThreads Only applicable when chunkSizeHours is used. If greater than 1, then we will run this
    *     many queries in parallel. This should only be used when querying extremely large datasets; generally consult
-   *     with Scalyr support before specifying a nonzero value for this parameter. In any case, this parameter should
-   *     never be more than about 3. Note that if you issue multiple simultaneous queries, they will share the
+   *     with Scalyr support before specifying a greater-than-one value for this parameter. In any case, this parameter
+   *     should never be more than about 3. Note that if you issue multiple simultaneous queries, they will share the
    *     threadpool.
    */
   public QueryService(String apiToken, int chunkSizeHours, int maxQueryThreads) {
@@ -145,14 +145,12 @@ public class QueryService extends ScalyrService {
     LogQueryResult merged = null;
     List<Pair<String>> chunkList = chunked.collect(Collectors.toList());
 
-    if (queryThreadpool != null) {
+    if (queryThreadpool != null)
       return parallelLogQuery(filter, maxCount, pageMode, columns, continuationToken, chunkList);
-    } else {
-      for (int i = 0; i < chunkList.size(); i++) {
-        Pair<String> pair = chunkList.get(i);
-        merged = LogQueryResult.merge(merged, logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken));
-        if (merged.matches.size() >= maxCount) break;
-      }
+
+    for (Pair<String> pair : chunkList) {
+      merged = LogQueryResult.merge(merged, logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken));
+      if (merged.matches.size() >= maxCount) break;
     }
 
     return merged;
@@ -165,10 +163,9 @@ public class QueryService extends ScalyrService {
   private LogQueryResult parallelLogQuery(String filter, Integer maxCount, PageMode pageMode, String columns, String continuationToken, List<Pair<String>> chunkList) {
     List<Future<LogQueryResult>> futures = new ArrayList<>();
     AtomicBoolean done = new AtomicBoolean(false);
-    for (int i = 0; i < chunkList.size(); i++) {
-      Pair<String> pair = chunkList.get(i);
-      futures.add(queryThreadpool.submit(() -> done.get() ? null : logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken)));
-    }
+    chunkList.forEach(pair ->
+      futures.add(queryThreadpool.submit(() -> done.get() ? null : logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken)))
+    );
 
     LogQueryResult merged = null;
     for (int i = 0; i < chunkList.size(); i++) {
