@@ -17,28 +17,21 @@
 
 package com.scalyr.api.query;
 
-import com.scalyr.api.ScalyrException;
-import com.scalyr.api.ScalyrNetworkException;
-import com.scalyr.api.ScalyrServerException;
-import com.scalyr.api.TuningConstants;
-import com.scalyr.api.internal.Logging;
+import com.scalyr.api.*;
 import com.scalyr.api.internal.ScalyrService;
 import com.scalyr.api.internal.ScalyrUtil;
 import com.scalyr.api.json.JSONArray;
 import com.scalyr.api.json.JSONObject;
-import com.scalyr.api.knobs.Knob;
 import com.scalyr.api.knobs.ConfigurationFile;
+import com.scalyr.api.knobs.Knob;
 import com.scalyr.api.logs.EventAttributes;
 import com.scalyr.api.logs.Severity;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Encapsulates the raw HTTP-level API to the log query service.
@@ -48,6 +41,8 @@ public class QueryService extends ScalyrService {
   /** If nonzero, divide queries into chunks of at most this size for serial execution. */
   private final int chunkSizeHours;
 
+  /** If non-null, then execute query chunks in parallel, up to the thread limit of this executor. */
+  private final ExecutorService queryThreadpool;
 
   /**
    * Construct a QueryService for non-chunked execution.
@@ -56,7 +51,7 @@ public class QueryService extends ScalyrService {
    *     be a "Read Logs" token.
    */
   public QueryService(String apiToken) {
-    this(apiToken, 0);
+    this(apiToken, 0, 0);
   }
 
   /**
@@ -74,13 +69,34 @@ public class QueryService extends ScalyrService {
    *     A reasonable chunk size is often 12 to 24 hours. Smaller values reduce the possibility of timeout, but add
    *     overhead for extra round-trips to the Scalyr server.
    *
-   *    chunkSizeHours is only supported for a limit set of query types; others will thrown a RuntimeException.
+   *     chunkSizeHours is only supported for a limit set of query types; others will throw a RuntimeException.
+   * @param maxParallelThreads Only applicable when chunkSizeHours is used. If greater than 1, then we will run this
+   *     many queries in parallel. This should only be used when querying extremely large datasets; generally consult
+   *     with Scalyr support before specifying a nonzero value for this parameter. In any case, this parameter should
+   *     never be more than about 3. Note that if you issue multiple simultaneous queries, they will share the
+   *     threadpool.
    */
-  public QueryService(String apiToken, int chunkSizeHours) {
+  public QueryService(String apiToken, int chunkSizeHours, int maxParallelThreads) {
     super(apiToken);
     this.chunkSizeHours = chunkSizeHours;
+    if (maxParallelThreads > 1) {
+      this.queryThreadpool = Executors.newFixedThreadPool(maxParallelThreads, r -> {
+        Thread thread = new Thread(r);
+        thread.setDaemon(true);
+        return thread;
+      });
+    } else
+      this.queryThreadpool = null;
   }
 
+  /**
+   * Shut down the threadpool used to parallelize query execution. Only needed if you supplied maxParallelThreads > 1
+   * when constructing this QueryService instance.
+   */
+  public void shutdown() {
+    if (queryThreadpool != null)
+      queryThreadpool.shutdown();
+  }
 
   /**
    * Specifies which direction to page through the matching log events when more events match the
@@ -128,13 +144,40 @@ public class QueryService extends ScalyrService {
 
     LogQueryResult merged = null;
     List<Pair<String>> chunkList = chunked.collect(Collectors.toList());
-    for (int i=0; i<chunkList.size(); i++) {
-      Pair<String> pair = chunkList.get(i);
-      LogQueryResult chunk = logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken);
-      merged = LogQueryResult.merge(merged, chunk);
-      if (merged.matches.size() >= maxCount) break;
+
+    if (queryThreadpool != null) {
+      return parallelLogQuery(filter, maxCount, pageMode, columns, continuationToken, chunkList);
+    } else {
+      for (int i = 0; i < chunkList.size(); i++) {
+        Pair<String> pair = chunkList.get(i);
+        merged = LogQueryResult.merge(merged, logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken));
+        if (merged.matches.size() >= maxCount) break;
+      }
     }
 
+    return merged;
+  }
+
+  /**
+   * Query the time ranges specified by chunkList, and return the merged result. Individual queries will be executed in
+   * parallel, using queryThreadpool.
+   */
+  private LogQueryResult parallelLogQuery(String filter, Integer maxCount, PageMode pageMode, String columns, String continuationToken, List<Pair<String>> chunkList) {
+    List<Future<LogQueryResult>> futures = new ArrayList<>();
+    AtomicBoolean done = new AtomicBoolean(false);
+    for (int i = 0; i < chunkList.size(); i++) {
+      Pair<String> pair = chunkList.get(i);
+      futures.add(queryThreadpool.submit(() -> done.get() ? null : logQuery_(filter, pair.a, pair.b, maxCount, pageMode, columns, continuationToken)));
+    }
+
+    LogQueryResult merged = null;
+    for (int i = 0; i < chunkList.size(); i++) {
+      merged = LogQueryResult.merge(merged, getAndWrapException(futures.get(i)));
+      if (merged.matches.size() >= maxCount) {
+        done.set(true);
+        break;
+      }
+    }
     return merged;
   }
 
@@ -142,6 +185,8 @@ public class QueryService extends ScalyrService {
   private LogQueryResult logQuery_(String filter, String startTime, String endTime, Integer maxCount,
                                  PageMode pageMode, String columns, String continuationToken)
       throws ScalyrException, ScalyrNetworkException {
+    long launchTime = System.currentTimeMillis();
+    debugLog("Launching query for [" + startTime + "..." + endTime + "]");
     JSONObject parameters = new JSONObject();
     parameters.put("token", apiToken);
     parameters.put("queryType", "log");
@@ -169,6 +214,7 @@ public class QueryService extends ScalyrService {
 
     JSONObject rawApiResponse = invokeApi("api/query", parameters);
     checkResponseStatus(rawApiResponse);
+    debugLog("Finishing query for [" + startTime + "..." + endTime + "] after " + (System.currentTimeMillis() - launchTime) + " ms");
     return unpackLogQueryResult(rawApiResponse);
   }
 
@@ -211,7 +257,7 @@ public class QueryService extends ScalyrService {
     } catch (Exception ignored) {
     }
 
-    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must numeric (in seconds-, millis-, or nanos-since-1970) when using a chunking QueryService");
+    throw new RuntimeException("Cannot parse [" + startTime + ", " + endTime + "); both values must be numeric (in seconds-, millis-, or nanos-since-1970) when using a chunking QueryService");
   }
 
   /** Split `[start, end)` into `[start, start + chunk), [start + chunk, start + chunk * 2), ... [start + chunk * N, end)`. */
@@ -219,15 +265,15 @@ public class QueryService extends ScalyrService {
     // figure out the right chunkSize to use per `chunkSizeHours` vs our supported start/end precisions
     // using 1/1/2470 as the cutoff for detecting the precision used by "end"
     final long chunkSize =
-      end < 500L*365*24*60*60       ? chunkSizeHours*3600L :       // seconds
-      end < 500L*365*24*60*60*1_000 ? chunkSizeHours*3600L*1_000 : // millis
-      chunkSizeHours*3600L*ScalyrUtil.NANOS_PER_SECOND;               // everything else nanos
+      end < 500L * 365 * 24 * 60 * 60 ? chunkSizeHours * 3600L :       // seconds
+        end < 500L * 365 * 24 * 60 * 60 * 1_000 ? chunkSizeHours * 3600L * 1_000 : // millis
+          chunkSizeHours * 3600L * ScalyrUtil.NANOS_PER_SECOND;               // everything else nanos
 
     ArrayList<Pair<Long>> ret = new ArrayList<>();
 
     for (int n = 0; n < 1000; n++) { // 1000 is just a short-circuit in case of weird input
-      long chunkStart = start + n*chunkSize;
-      long chunkEnd   = chunkStart + chunkSize;
+      long chunkStart = start + n * chunkSize;
+      long chunkEnd = chunkStart + chunkSize;
       ret.add(new Pair(chunkStart, Math.min(end, chunkEnd)));
       if (chunkEnd >= end)
         return ret.stream();
@@ -235,10 +281,6 @@ public class QueryService extends ScalyrService {
 
     throw new RuntimeException("Too many chunks for [" + start + ", " + end + ")");
   }
-
-
-
-
 
   /**
    * Given the raw server response to a log query, encapsulate the query result in a LogQueryResult.
@@ -339,12 +381,29 @@ public class QueryService extends ScalyrService {
 
     Stream<Pair<String>> chunked = splitIntoChunks(startTime, endTime, chunkSizeHours);
 
-    return chunked
-      .map(pair -> numericQuery_(filter, function, pair.a, pair.b, buckets))
-      .collect(Collectors.reducing(null, NumericQueryResult::merge));
+    if (queryThreadpool != null) {
+      return parallelNumericQuery(filter, function, buckets, chunked);
+    } else {
+      return chunked
+        .map(pair -> numericQuery_(filter, function, pair.a, pair.b, buckets))
+        .collect(Collectors.reducing(null, NumericQueryResult::merge));
     }
+  }
 
+  /**
+   * Query the time ranges specified by chunkList, and return the merged result. Individual queries will be executed in
+   * parallel, using queryThreadpool.
+   */
+  private NumericQueryResult parallelNumericQuery(String filter, String function, Integer buckets, Stream<Pair<String>> chunkList) {
+    // !!! test
+    List<Future<NumericQueryResult>> futures = new ArrayList<>();
+    chunkList.forEach(chunk -> futures.add(queryThreadpool.submit(() -> numericQuery_(filter, function, chunk.a, chunk.b, buckets))));
 
+    return futures
+      .stream()
+      .map(QueryService::getAndWrapException)
+      .collect(Collectors.reducing(null, NumericQueryResult::merge));
+  }
 
   // actual workhorse of for one blocking query call
   private NumericQueryResult numericQuery_(String filter, String function, String startTime,
@@ -566,6 +625,13 @@ public class QueryService extends ScalyrService {
     return result;
   }
 
+  private static <T> T getAndWrapException(Future<T> future) {
+    try {
+      return future.get();
+    } catch (InterruptedException | ExecutionException ex) {
+      throw new RuntimeException(ex);
+    }
+  }
 
   /**
    * Convert the given value to a Long. If the value is null, return null. If the value cannot be
@@ -661,9 +727,6 @@ public class QueryService extends ScalyrService {
       ret.matches.addAll(b.matches);
       return ret;
     }
-
-
-
 
     @Override public String toString() {
       int matchCount = matches.size();
@@ -904,12 +967,26 @@ public class QueryService extends ScalyrService {
   }
 
 
+  //////////////////
+  // Test harness //
+  //////////////////
+
+  private static boolean debugLogging = false;
+  private static final long launchTime = System.currentTimeMillis();
+
+  private static void debugLog(String message) {
+    if (debugLogging)
+      System.out.println((System.currentTimeMillis() - launchTime) / 1000.0 + ": " + message);
+  }
+
   /**
    * Quick, hacky cmd line interface; first arg is the name of the query method and
    * subsequent args are 1-for-1 positional parameters for that method.  Provide '-' for
    * optional parameters you wish to omit.
    */
   public static void main(String[] args) {
+    debugLogging = true;
+
     // use the ApacheHttpClient; the java.net version is highly non-performant
     Knob.setDefaultFiles(new ConfigurationFile[0]);
     TuningConstants.useApacheHttpClientForEventUploader = new Knob.Boolean("useApacheHttpClientForEventUploader", true);
@@ -928,7 +1005,7 @@ public class QueryService extends ScalyrService {
       printUsageAndExit("ERROR: unrecognized method '" + method + "'");
 
     try {
-      QueryService svc = new QueryService(apiToken, chunkSizeHours == null ? 0 : Integer.parseInt(chunkSizeHours));
+      QueryService svc = new QueryService(apiToken, chunkSizeHours == null ? 0 : Integer.parseInt(chunkSizeHours), 3/*!!!*/);
 
       // 'parse' args, so hacky
       String filter = null, function = null, field = null, startTime = null, endTime = null, columns = null, continuationToken = null;
@@ -962,6 +1039,8 @@ public class QueryService extends ScalyrService {
     } catch (Exception e) {
       printUsageAndExit(e.getMessage());
     }
+
+    debugLog("Finished!");
   }
 
   // TODO: make these prettier
@@ -985,5 +1064,6 @@ public class QueryService extends ScalyrService {
     System.err.println("Quitting");
     System.exit(1);
   }
+
 
 }
