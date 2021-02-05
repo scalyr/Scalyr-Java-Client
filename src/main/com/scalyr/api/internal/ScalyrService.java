@@ -26,11 +26,10 @@ import com.scalyr.api.json.JSONParser;
 import com.scalyr.api.json.JSONParser.ByteScanner;
 import com.scalyr.api.logs.Events;
 import com.scalyr.api.logs.Severity;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.CloseableHttpClient;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.Random;
@@ -170,7 +169,7 @@ public abstract class ScalyrService {
    * @throws ScalyrNetworkException
    */
   public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, boolean enableGzip) {
-    return invokeApiX(methodName, parameters, new RpcOptions(), enableGzip);
+    return invokeApiX(methodName, parameters, new RpcOptions(), enableGzip, makePost());
   }
 
   /**
@@ -194,7 +193,7 @@ public abstract class ScalyrService {
    * @throws ScalyrException
    * @throws ScalyrNetworkException
    */
-  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options, boolean enableGzip) {
+  public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options, boolean enableGzip, PostJson post) {
     // Produce a shuffled copy of the server addresses, so that load is distributed
     // across the servers.
     int N = serverAddresses.length;
@@ -215,7 +214,7 @@ public abstract class ScalyrService {
       String serverAddress = shuffled[serverIndex];
       long requestStartTimeMs = ScalyrUtil.currentTimeMillis();
       try {
-        return invokeApiOnServer(serverAddress, methodName, parameters, options, enableGzip);
+        return invokeApiOnServer(serverAddress, methodName, parameters, options, enableGzip, post);
       } catch (ScalyrNetworkException ex) {
         // Fall into the loop and retry the operation on the next server.
         // If there are no more servers, or our deadline has expired, then
@@ -248,7 +247,7 @@ public abstract class ScalyrService {
    * Overloading 4-parameter invokeApiX() with enableGzip set to default value.
    */
   public InvokeApiResult invokeApiX(String methodName, JSONObject parameters, RpcOptions options) {
-    return invokeApiX(methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT);
+    return invokeApiX(methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT, makePost());
   }
 
   /**
@@ -303,6 +302,43 @@ public abstract class ScalyrService {
     public int latencyMs;
   }
 
+  public interface PostJson {
+    AbstractHttpClient postJson(URL url, int requestLength, boolean closeConnections, JSONObject parameters, RpcOptions options, String contentEncoding) throws IOException;
+  }
+
+  private static PostJson makePost() {
+    if (TuningConstants.useApacheHttpClientForEventUploader != null && TuningConstants.useApacheHttpClientForEventUploader.get()) {
+      return ScalyrService::postJsonWithApache;
+    } else {
+      return ScalyrService::postJsonWithJavaNet;
+    }
+  }
+
+  private static AbstractHttpClient postJsonWithJavaNet(URL url, int requestLength, boolean closeConnections, JSONObject parameters, RpcOptions options, String contentEncoding) throws IOException {
+    JavaNetHttpClient resp = new JavaNetHttpClient(url, requestLength, closeConnections, options, "application/json", contentEncoding);
+    OutputStream output = resp.getOutputStream();
+    parameters.writeJSONBytes(output);
+    output.flush();
+    output.close();
+    return resp;
+  }
+
+  private static AbstractHttpClient postJsonWithApache(URL url, int requestLength, boolean closeConnections, JSONObject parameters, RpcOptions options, String contentEncoding) throws IOException {
+    final String contentType = "application/json";
+    final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    parameters.writeJSONBytes(bos);
+    final byte[] requestBody = bos.toByteArray();
+    return new ApacheHttpClient(url, requestLength, closeConnections, options, requestBody, requestLength, contentType, contentEncoding);
+  }
+
+  public static AbstractHttpClient postJsonWithApache(CloseableHttpClient httpClient, HttpClientContext httpContext, URL url, int requestLength, boolean closeConnections, JSONObject parameters, RpcOptions options, String contentEncoding) throws IOException {
+    final String contentType = "application/json";
+    final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    parameters.writeJSONBytes(bos);
+    final byte[] requestBody = bos.toByteArray();
+    return new ApacheHttpClient(httpClient, httpContext, url, requestLength, closeConnections, options, requestBody, requestLength, contentType, contentEncoding);
+  }
+
   /**
    * Invoke serverAddress/methodName on the server, sending the specified parameters as the request
    * body. Return the (JSON-format) response.
@@ -311,7 +347,7 @@ public abstract class ScalyrService {
    * @throws ScalyrNetworkException
    */
   protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters,
-      RpcOptions options, boolean enableGzip) {
+      RpcOptions options, boolean enableGzip, PostJson post) {
     AbstractHttpClient httpClient = null;
 
     long timeBeforeCreatingClient = System.nanoTime();
@@ -335,21 +371,7 @@ public abstract class ScalyrService {
         TuningConstants.serverInvocationCounter.increment();
 
       try {
-        if (TuningConstants.useApacheHttpClientForEventUploader != null && TuningConstants.useApacheHttpClientForEventUploader.get()) {
-          ByteArrayOutputStream requestBuffer = new ByteArrayOutputStream();
-          parameters.writeJSONBytes(requestBuffer);
-
-          byte[] byteArray = requestBuffer.toByteArray();
-          httpClient = new ApacheHttpClient(url, requestLength, closeConnections, options, byteArray, byteArray.length,
-                                            "application/json", enableGzip);
-        } else {
-          httpClient = new JavaNetHttpClient(url, requestLength, closeConnections, options, "application/json", enableGzip);
-
-          OutputStream output = httpClient.getOutputStream();
-          parameters.writeJSONBytes(output);
-          output.flush();
-          output.close();
-        }
+        httpClient = post.postJson(url, requestLength, closeConnections, parameters, options, enableGzip ? "gzip" : null);
 
         // Retrieve the response.
         timeBeforeRequestingResponse = System.nanoTime();
@@ -449,8 +471,8 @@ public abstract class ScalyrService {
   /**
    * Overloading invokeApiOnServer() with enableGzip set to default value.
    */
-  protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters, RpcOptions options) {
-    return invokeApiOnServer(serverAddress, methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT);
+  protected InvokeApiResult invokeApiOnServer(String serverAddress, String methodName, JSONObject parameters, RpcOptions options, PostJson post) {
+    return invokeApiOnServer(serverAddress, methodName, parameters, options, Events.ENABLE_GZIP_BY_DEFAULT, post);
   }
 
   public static void throwIfErrorStatus(JSONObject responseJson) {

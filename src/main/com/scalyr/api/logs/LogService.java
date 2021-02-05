@@ -19,7 +19,7 @@ package com.scalyr.api.logs;
 
 import com.scalyr.api.ScalyrException;
 import com.scalyr.api.ScalyrNetworkException;
-import com.scalyr.api.internal.ScalyrService;
+import com.scalyr.api.internal.*;
 import com.scalyr.api.json.JSONArray;
 import com.scalyr.api.json.JSONObject;
 import com.scalyr.api.json.JSONStreamAware;
@@ -64,6 +64,11 @@ public class LogService extends ScalyrService {
   public JSONObject uploadEvents(String sessionId, JSONObject sessionInfo,
       JSONStreamAware events, JSONArray threadInfos, boolean enableGzip)
       throws ScalyrException, ScalyrNetworkException {
+    JSONObject parameters = buildParams(sessionId, sessionInfo, events, threadInfos);
+    return invokeApi("addEvents", parameters, enableGzip);
+  }
+
+  public JSONObject buildParams(String sessionId, JSONObject sessionInfo, JSONStreamAware events, JSONArray threadInfos) {
     JSONObject parameters = new JSONObject();
 
     parameters.put("clientVersion", 1);
@@ -74,8 +79,13 @@ public class LogService extends ScalyrService {
     parameters.put("events", events);
     if (threadInfos != null && threadInfos.size() > 0)
       parameters.put("threads", threadInfos);
+    return parameters;
+  }
 
-    return invokeApi("addEvents", parameters, enableGzip);
+  public JSONObject uploadEvents(ApacheProcessContext apc, ApacheThreadContext atc, JSONObject parameters) throws ScalyrException {
+    return invokeApiX("addEvents", parameters, new RpcOptions(), Events.ENABLE_GZIP_BY_DEFAULT,
+        (url, requestLength, closeConnections, params, options, contentEncoding) ->
+            ScalyrService.postJsonWithApache(apc.client, atc.context, url, requestLength, closeConnections, params, options, contentEncoding)).response;
   }
 
   /**
