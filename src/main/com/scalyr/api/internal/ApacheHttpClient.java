@@ -32,7 +32,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
   private String responseEncoding;
 
   /**
-   * Version of constructor that creates a new client per instance and no context.
+   * Version of constructor that creates a new client and context per instance.
    */
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, String contentEncoding) throws IOException {
@@ -49,7 +49,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
         ;
 
     CloseableHttpClient httpClient = clientBuilder.build();
-    HttpClientContext httpContext = null;  // this matches the .execute(request) behavior (w/ no context)
+    HttpClientContext httpContext = HttpClientContext.create();
     postJson(httpClient, httpContext, url, requestLength, closeConnections, options, requestBody, requestBodyLength,
         contentType, contentEncoding);
   }

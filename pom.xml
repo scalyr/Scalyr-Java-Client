@@ -4,7 +4,7 @@
     <groupId>com.scalyr</groupId>
     <artifactId>scalyr-client</artifactId>
     <packaging>jar</packaging>
-    <version>6.0.25</version>
+    <version>6.0.25-SNAPSHOT</version>
     <name>Scalyr Client</name>
     <description>Client library for the Scalyr API</description>
     <url>https://github.com/scalyr/Scalyr-Java-Client</url>
@@ -32,7 +32,7 @@
         <url>https://github.com/scalyr/Scalyr-Java-Client</url>
         <connection>scm:git:git://github.com/scalyr/Scalyr-Java-Client.git</connection>
         <developerConnection>scm:git:git@github.com:scalyr/Scalyr-Java-Client.git</developerConnection>
-    <tag>scalyr-client-6.0.25</tag>
+    <tag>scalyr-client-6.0.6</tag>
   </scm>
 
     <developers>

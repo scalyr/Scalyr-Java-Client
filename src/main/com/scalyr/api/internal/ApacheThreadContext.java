@@ -3,7 +3,7 @@ package com.scalyr.api.internal;
 import org.apache.http.client.protocol.HttpClientContext;
 
 /**
- * Holds an HTTP client context. For best MT performance, each thread should maintain its own instance.
+ * Holds an HTTP client context. For best multithreaded performance, each thread should maintain its own instance.
  *
  * > While HttpClient instances are thread safe and can be shared between multiple threads of execution,
  * > it is highly recommended that each thread maintains its own dedicated instance of HttpContext.

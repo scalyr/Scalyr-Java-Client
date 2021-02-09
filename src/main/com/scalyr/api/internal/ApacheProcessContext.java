@@ -21,7 +21,7 @@ public final class ApacheProcessContext implements AutoCloseable {
   public ApacheProcessContext() {
     cm = new PoolingHttpClientConnectionManager();
     cm.setMaxTotal(Knob.getInteger("scalyrClientMaxConnections", 20));
-    cm.setDefaultMaxPerRoute(Knob.getInteger("scalyrClientMaxConnectionsPreRoute", 15));
+    cm.setDefaultMaxPerRoute(Knob.getInteger("scalyrClientMaxConnectionsPerRoute", 15));
     HttpClientBuilder builder = HttpClients.custom()
         .setConnectionManager(cm);
     client = builder.build();

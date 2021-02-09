@@ -85,7 +85,7 @@ public class LogService extends ScalyrService {
   public JSONObject uploadEvents(ApacheProcessContext apc, ApacheThreadContext atc, JSONObject parameters) throws ScalyrException {
     return invokeApiX("addEvents", parameters, new RpcOptions(), Events.ENABLE_GZIP_BY_DEFAULT,
         (url, requestLength, closeConnections, params, options, contentEncoding) ->
-            ScalyrService.postJsonWithApache(apc.client, atc.context, url, requestLength, closeConnections, params, options, contentEncoding)).response;
+            ScalyrService.postWithApache(apc.client, atc.context, url, requestLength, closeConnections, params, options, contentEncoding)).response;
   }
 
   /**
