@@ -7,12 +7,15 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.impl.client.*;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.util.zip.GZIPInputStream;
 
@@ -32,7 +35,7 @@ public class ApacheHttpClient extends AbstractHttpClient {
   private String responseEncoding;
 
   /**
-   * Version of constructor that creates a new client and context per instance.
+   * Version of constructor with desired Content-Encoding passed in.
    */
   public ApacheHttpClient(URL url, int requestLength, boolean closeConnections, RpcOptions options,
                           byte[] requestBody, int requestBodyLength, String contentType, String contentEncoding) throws IOException {
@@ -49,23 +52,6 @@ public class ApacheHttpClient extends AbstractHttpClient {
         ;
 
     CloseableHttpClient httpClient = clientBuilder.build();
-    HttpClientContext httpContext = HttpClientContext.create();
-    postJson(httpClient, httpContext, url, requestLength, closeConnections, options, requestBody, requestBodyLength,
-        contentType, contentEncoding);
-  }
-
-  /**
-   * Version of constructor that uses provided client and context.
-   */
-  public ApacheHttpClient(CloseableHttpClient httpClient, HttpClientContext httpContext, URL url, int requestLength, boolean closeConnections, RpcOptions options,
-    byte[] requestBody, int requestBodyLength, String contentType, String contentEncoding) throws IOException {
-    postJson(httpClient, httpContext, url, requestLength, closeConnections, options, requestBody, requestBodyLength,
-        contentType, contentEncoding);
-  }
-
-  private void postJson(CloseableHttpClient httpClient, HttpClientContext httpContext, URL url, int requestLength, boolean closeConnections, RpcOptions options,
-      byte[] requestBody, int requestBodyLength, String contentType, String contentEncoding) throws IOException {
-
     RequestConfig.Builder configBuilder = RequestConfig.custom();
     configBuilder.setRedirectsEnabled(false);
     configBuilder.setConnectionRequestTimeout(options.connectionTimeoutMs);
@@ -88,7 +74,8 @@ public class ApacheHttpClient extends AbstractHttpClient {
 
     request.setConfig(configBuilder.build());
 
-    response = httpClient.execute(request, httpContext);
+    response = httpClient.execute(request);
+
     HttpEntity responseEntity = response.getEntity();
     responseContentType = (responseEntity != null && responseEntity.getContentType() != null) ? responseEntity.getContentType().getValue() : null;
     responseEncoding = (responseEntity != null && responseEntity.getContentEncoding() != null) ? responseEntity.getContentEncoding().getValue() : null;
