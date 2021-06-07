@@ -15,11 +15,30 @@ import java.util.function.*;
 public interface KeyValueLog {
 
   //--------------------------------------------------------------------------------
-  // abstract methods
+  // key-value adders
   //--------------------------------------------------------------------------------
 
   /** Add one key/value pair to the event attributes for the next log event. */
   KeyValueLog add(String key1, Object val1);
+
+  /** Add two key/value pairs to the event attributes for the next log event. */
+  default KeyValueLog add(String key1, Object val1, String key2, Object val2) {
+    return add(key1, val1).add(key2, val2);
+  }
+
+  /** Add three key/value pairs to the event attributes for the next log event. */
+  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
+    return add(key1, val1).add(key2, val2).add(key3, val3);
+  }
+
+  /** Add four key/value pairs to the event attributes for the next log event. */
+  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
+    return add(key1, val1).add(key2, val2).add(key3, val3).add(key4, val4);
+  }
+
+  //--------------------------------------------------------------------------------
+  // annotations
+  //--------------------------------------------------------------------------------
 
   /** Add key/value pairs returned by `annotFn` to the event attributes. */
   KeyValueLog add(AnnotFn annotFn);
@@ -39,34 +58,12 @@ public interface KeyValueLog {
   /** Add exception information and stack trace key/value pairs to the event attributes. */
   KeyValueLog err(Throwable e);
 
+  //--------------------------------------------------------------------------------
+  // emitters
+  //--------------------------------------------------------------------------------
+
   /** Write a log event at `error` severity using the collected event attributes. */
   void emit(Severity sev);
-
-  //--------------------------------------------------------------------------------
-  // defaults
-  //--------------------------------------------------------------------------------
-
-  /** Evaluate rate-limiter and call log function if rate limiter returns `true`. */
-  default void limit(RateLimiter limiter, Runnable logFn) {
-    if (limiter.tryAcquire()) {
-      logFn.run();
-    }
-  }
-
-  /** Add two key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2) {
-    return add(key1, val1).add(key2, val2);
-  }
-
-  /** Add three key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
-    return add(key1, val1).add(key2, val2).add(key3, val3);
-  }
-
-  /** Add four key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
-    return add(key1, val1).add(key2, val2).add(key3, val3).add(key4, val4);
-  }
 
   /** Write a log event at `debug` severity using the collected event attributes. */
   default void debug() { emit(Severity.fine);};
@@ -86,6 +83,13 @@ public interface KeyValueLog {
       warn();
     } else {
       error();
+    }
+  }
+
+  /** Evaluate rate-limiter and call log function if rate limiter returns `true`. */
+  default void limit(RateLimiter limiter, Runnable logFn) {
+    if (limiter.tryAcquire()) {
+      logFn.run();
     }
   }
 
