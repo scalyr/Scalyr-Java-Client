@@ -31,9 +31,6 @@ import java.util.stream.Collectors;
  */
 public final class EventBuilder {
 
-  /** Sink which does nothing, provided as convenience */
-  public static final BiConsumer<Severity, EventAttributes> SILENT_EVENT_SINK = (sev, attrs) -> {};
-
   /** Class to start the builder call chaining. */
   public static final class EventStart implements KeyValueLog {
 
@@ -52,7 +49,21 @@ public final class EventBuilder {
     // overrides
     //--------------------------------------------------------------------------------
 
-    @Override public KeyValueLog add(String key1, Object val1) { return new Builder(eventSink).add(key1, val1); }
+    @Override public KeyValueLog add(String key1, Object val1) {
+      return new Builder(eventSink).add(key1, val1);
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2) {
+      return new Builder(eventSink).add(key1, val1, key2, val2);
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
+      return new Builder(eventSink).add(key1, val1, key2, val2, key3, val3);
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
+      return new Builder(eventSink).add(key1, val1, key2, val2, key3, val3, key4, val4);
+    }
 
     @Override public KeyValueLog add  (AnnotFn annotFn) { return new Builder(eventSink).add  (annotFn); }
     @Override public KeyValueLog union(AnnotFn annotFn) { return new Builder(eventSink).union(annotFn); }
@@ -86,6 +97,27 @@ public final class EventBuilder {
 
     @Override public KeyValueLog add(String key1, Object val1) {
       attrs.put(key1, val1);
+      return this;
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2) {
+      attrs.put(key1, val1);
+      attrs.put(key2, val2);
+      return this;
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
+      attrs.put(key1, val1);
+      attrs.put(key2, val2);
+      attrs.put(key3, val3);
+      return this;
+    }
+
+    @Override public KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
+      attrs.put(key1, val1);
+      attrs.put(key2, val2);
+      attrs.put(key3, val3);
+      attrs.put(key4, val4);
       return this;
     }
 

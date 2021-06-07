@@ -22,19 +22,13 @@ public interface KeyValueLog {
   KeyValueLog add(String key1, Object val1);
 
   /** Add two key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2) {
-    return add(key1, val1).add(key2, val2);
-  }
+  KeyValueLog add(String key1, Object val1, String key2, Object val2);
 
   /** Add three key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
-    return add(key1, val1).add(key2, val2).add(key3, val3);
-  }
+  KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3);
 
   /** Add four key/value pairs to the event attributes for the next log event. */
-  default KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
-    return add(key1, val1).add(key2, val2).add(key3, val3).add(key4, val4);
-  }
+  KeyValueLog add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4);
 
   //--------------------------------------------------------------------------------
   // annotations
@@ -66,13 +60,13 @@ public interface KeyValueLog {
   void emit(Severity sev);
 
   /** Write a log event at `debug` severity using the collected event attributes. */
-  default void debug() { emit(Severity.fine);};
+  default void debug() { emit(Severity.fine); };
 
   /** Write a log event at `info` severity using the collected event attributes. */
-  default void info() { emit(Severity.info);};
+  default void info() { emit(Severity.info); };
 
   /** Write a log event at `warn` severity using the collected event attributes. */
-  default void warn() { emit(Severity.warning);};
+  default void warn() { emit(Severity.warning); };
 
   /** Write a log event at `error` severity using the collected event attributes. */
   default void error() { emit(Severity.error); };
