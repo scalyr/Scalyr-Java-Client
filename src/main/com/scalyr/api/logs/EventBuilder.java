@@ -24,19 +24,10 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
- * Contains implementations of {@link KeyValueLog} which allow key-value logging using builder call chaining.
+ * This class is normally not used directly, but instead used by a `getLogger()` method which allows providing
+ * a class-specific log instance.
  *
- * Example usage:
- *
- * <pre>
- *   // Emit an event at Severity.info
- *   EventStart log = new EventStart(scalyrSink)
- *     .add("tag"   , "foo")
- *     .add("subtag", "bar")
- *     .add("count" , 123  )
- *     .info();
- * </pre>
- *
+ * For example usage, see: {@link KeyValueLog}.
  */
 public final class EventBuilder {
 
