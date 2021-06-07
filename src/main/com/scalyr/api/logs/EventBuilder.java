@@ -24,8 +24,16 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
- * This class is normally not used directly, but instead used by a `getLogger()` method which allows providing
- * a class-specific log instance.
+ * Contains implementations of {@link KeyValueLog} which allow key-value logging using builder call chaining.
+ *
+ * These classes are not normally used directly. Users will likely prefer using a factory method e.g. `getLogger`
+ * which returns instances of {@link EventStart}.
+ *
+ * <pre>
+ *   static KeyValueLog getLogger() {
+ *     return new EventStart(sink); // in most cases `sink` is a bi-consumer that is long lived in order to reduce object creation
+ *   }
+ * </pre>
  *
  * For example usage, see: {@link KeyValueLog}.
  */

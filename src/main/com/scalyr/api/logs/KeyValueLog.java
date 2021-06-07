@@ -92,18 +92,18 @@ public interface KeyValueLog {
   //--------------------------------------------------------------------------------
 
   /**
-   * Used for generalized logging by {@link #incl}, this does not allow called-by tracking.
-   * Prefer functional interface via {@link #add(AnnotFn)}, e.g. `.add(stats::annot)`, to this where possible.
+   * A functional log interface. Use this IN FAVOR OF the class-based interface.
+   * It allows called-by tracking. Example use: `.add(stats::annot)`.
+   */
+  interface AnnotFn extends Function<EventAttributes, EventAttributes> {}
+
+  /**
+   * A class-based log interface. Use this when it is not possible to use the functional interface.
+   * It does not allow called-by tracking. Example use: `.incl(obj)`.
    */
   interface Annot {
     AnnotFn annotFn();
   }
-
-  /**
-   * A simple method contract that supports called-by tracking and requires no explicit `implements`
-   * on class def.
-   */
-  interface AnnotFn extends Function<EventAttributes, EventAttributes> {}
 
   interface RateLimiter {
     boolean tryAcquire();
