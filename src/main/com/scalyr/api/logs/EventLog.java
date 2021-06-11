@@ -1,3 +1,20 @@
+/*
+ * Scalyr client library
+ * Copyright 2012 Scalyr, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.scalyr.api.logs;
 
 import com.google.common.base.Throwables;
@@ -25,18 +42,16 @@ public final class EventLog implements KeyValueLog<EventLog.Builder> {
     return new Builder(sink);
   }
 
-  public static class Builder extends TypedBuilder<Builder> {
+  public static final class Builder extends AbstractBuilder<Builder> {
 
     public Builder(BiConsumer<Severity, EventAttributes> sink) {
       super(sink);
-      this.bld = this;
     }
 
   }
 
-  public static class TypedBuilder<T> {
-
-    protected T bld;
+  /** Extend this class to add to set of methods available in call chain. */
+  public static class AbstractBuilder<T extends AbstractBuilder<T>> {
 
     /** Set of attributes accumulated over calls. */
     final EventAttributes attrs = new EventAttributes();
@@ -44,8 +59,7 @@ public final class EventLog implements KeyValueLog<EventLog.Builder> {
     /** Sink to emit events to */
     final BiConsumer<Severity, EventAttributes> sink;
 
-    public TypedBuilder(BiConsumer<Severity, EventAttributes> sink) {
-      this.bld = null;
+    public AbstractBuilder(BiConsumer<Severity, EventAttributes> sink) {
       this.sink = sink;
     }
 
@@ -54,33 +68,37 @@ public final class EventLog implements KeyValueLog<EventLog.Builder> {
     //--------------------------------------------------------------------------------
 
     /** Add one key/value pair to the event attributes for the next log event. */
+    @SuppressWarnings("unchecked")
     public T add(String key1, Object val1) {
       attrs.put(key1, val1);
-      return bld;
+      return (T)this;
     }
 
     /** Add two key/value pairs to the event attributes for the next log event. */
+    @SuppressWarnings("unchecked")
     public T add(String key1, Object val1, String key2, Object val2) {
       attrs.put(key1, val1);
       attrs.put(key2, val2);
-      return bld;
+      return (T)this;
     }
 
     /** Add three key/value pairs to the event attributes for the next log event. */
+    @SuppressWarnings("unchecked")
     public T add(String key1, Object val1, String key2, Object val2, String key3, Object val3) {
       attrs.put(key1, val1);
       attrs.put(key2, val2);
       attrs.put(key3, val3);
-      return bld;
+      return (T)this;
     }
 
     /** Add four key/value pairs to the event attributes for the next log event. */
+    @SuppressWarnings("unchecked")
     public T add(String key1, Object val1, String key2, Object val2, String key3, Object val3, String key4, Object val4) {
       attrs.put(key1, val1);
       attrs.put(key2, val2);
       attrs.put(key3, val3);
       attrs.put(key4, val4);
-      return bld;
+      return (T)this;
     }
 
     //--------------------------------------------------------------------------------
@@ -88,46 +106,52 @@ public final class EventLog implements KeyValueLog<EventLog.Builder> {
     //--------------------------------------------------------------------------------
 
     /** Add key/value pairs returned by `annotFn` to the event attributes. */
+    @SuppressWarnings("unchecked")
     public T add(AnnotFn annotFn) {
       annotFn.apply(attrs);
-      return bld;
+      return (T)this;
     }
 
     /** Add key/value pairs (preserving existing key/values w/ matching keys) returned by `annotFn` to the event attributes. */
+    @SuppressWarnings("unchecked")
     public T union(AnnotFn annotFn) {
       final EventAttributes ea = annotFn.apply(new EventAttributes());
       attrs.underwriteFrom(ea);
-      return bld;
+      return (T)this;
     }
 
     /** Add key/value pairs returned by `annotFn` and prefix keys w/ `prefix`. */
+    @SuppressWarnings("unchecked")
     public T add(String prefix, AnnotFn annotFn) {
       final EventAttributes ea = annotFn.apply(new EventAttributes());
       for (Map.Entry<String, Object> entry : ea.getEntries()) {
         attrs.put(prefix + entry.getKey(), entry.getValue());
       }
-      return bld;
+      return (T)this;
     }
 
     /** Add key/value pairs (preserving existing key/values w/ matching keys) returned by `annotFn` and prefix keys w/ `prefix`. */
+    @SuppressWarnings("unchecked")
     public T union(String prefix, AnnotFn annotFn) {
       final EventAttributes ea = annotFn.apply(new EventAttributes());
       for (Map.Entry<String, Object> entry : ea.getEntries()) {
         attrs.putIfAbsent(prefix + entry.getKey(), entry.getValue());
       }
-      return bld;
+      return (T)this;
     }
 
     /** Add key/value pairs returned by `annot` implementation. */
+    @SuppressWarnings("unchecked")
     public T incl(Annot annot) {
       annot.annotFn().apply(attrs);
-      return bld;
+      return (T)this;
     }
 
     /** Add exception information and stack trace key/value pairs to the event attributes. */
+    @SuppressWarnings("unchecked")
     public T err(Throwable e) {
       annot(attrs, e);
-      return bld;
+      return (T)this;
     }
 
     //--------------------------------------------------------------------------------
